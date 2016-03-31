@@ -6,7 +6,7 @@ import glob, os, warnings
 
 
 # Directory with logs
-prefix = "results"
+prefix = ""
 
 # Snippets for LaTeX tabular
 prolog = r"""\begin{table}[b]
@@ -14,11 +14,11 @@ prolog = r"""\begin{table}[b]
 \begin{tabular}{lrrrrrr}
 %
 case
-    &   \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
-                              & $\norm{{\cal E}_\mathrm{glob}}_q$
-                                          & $\cred{N^\fq}\norm{{\cal E}_\mathrm{loc}}_q$
-                                                      & $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_1}}}$
-                                                                  & $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_2}}}$
+& \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
+& $\norm{{\cal E}_\mathrm{glob}}_q$
+& $\cred{N^\fq}\norm{{\cal E}_\mathrm{loc}}_q$
+& $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_1}}}$
+& $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_2}}}$
 \\\hline\hline
 %
 """
