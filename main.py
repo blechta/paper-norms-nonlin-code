@@ -47,14 +47,14 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     r"""Find approximation to p-Laplace problem with rhs f,
     and compute global and local liftings of the residual.
     Return tuple (
-        \sum_a ||\nabla r  ||_{p,\omega_a}^p N/|\omega_a| \psi_a,
-        \sum_a ||\nabla r^a||_{p,\omega_a}^p N/|\omega_a| \psi_a,
-        \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p 1/|\omega_a| \psi_a,
+        \sum_a ||\nabla r     ||_{p,\omega_a}^p \psi_a/|\omega_a|,
+        \sum_a ||\nabla r^a   ||_{p,\omega_a}^p \psi_a/|\omega_a|,
+        \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p \psi_a/|\omega_a|,
         C_{cont,PF},
         ||\nabla r||_p^{p-1},
-        ( \sum_a ||\nabla r_a||_p^p )^{1/q},
-        Eff_{(3.8a)},
-        Eff_{(3.8b)}
+        ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
+        Eff_{(4.8a)},
+        Eff_{(4.8b)}
     ). First three are P1 functions, the rest are numbers.
     """
     q = p/(p-1) # Dual Lebesgue exponent
@@ -88,9 +88,9 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     r_norm_glob = sobolev_norm(r_glob, p)**(p/q)
 
     # Sanity check
-    assert np.isclose(assemble(dr_glob_fine  *dx), N*r_norm_glob**q)
-    assert np.isclose(assemble(dr_glob_coarse*dx), N*r_norm_glob**q)
-    assert np.isclose(assemble(dr_glob_p1    *dx), N*r_norm_glob**q)
+    assert np.isclose(assemble(dr_glob_fine  *dx), r_norm_glob**q)
+    assert np.isclose(assemble(dr_glob_coarse*dx), r_norm_glob**q)
+    assert np.isclose(assemble(dr_glob_p1    *dx), r_norm_glob**q)
 
     # Compute local liftings
     r_norm_loc, r_loc_p1 = compute_local_liftings(p, V, f, S)
@@ -99,8 +99,6 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     if exact_solution:
         ee_fine, ee_coarse = compute_cellwise_grad(exact_solution-u, p,
                                  mesh_fine=u.function_space().mesh())
-        ee_fine  .vector().__imul__(1.0/N) # take back the scaling
-        ee_coarse.vector().__imul__(1.0/N) # take back the scaling
         ee_p1 = distribute_p0_to_p1(ee_coarse, Function(V))
         ee = sobolev_norm(exact_solution-u, p)
         assert np.isclose(assemble(ee_fine  *dx), ee**p)
@@ -113,16 +111,16 @@ def compute_liftings(p, mesh, f, exact_solution=None):
 
     # Check effectivity of localization estimates
     C_PF = poincare_friedrichs_cutoff(mesh, p)
-    ratio_a = ( N**(1.0/p) * C_PF * r_norm_loc ) / r_norm_glob
-    ratio_b = ( N**(1.0/q) * r_norm_glob ) / r_norm_loc
+    ratio_a = ( N * C_PF * r_norm_loc ) / r_norm_glob
+    ratio_b = r_norm_glob / r_norm_loc
     assert ratio_a >= 1.0 and ratio_b >= 1.0
 
     # Report
-    info_blue(r"||\nabla r||_p^{p-1} = %g, ( \sum_a ||\nabla r_a||_p^p )^{1/q} = %g"
+    info_blue(r"||\nabla r||_p^{p-1} = %g, ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q} = %g"
               % (r_norm_glob, r_norm_loc))
     info_blue("C_{cont,PF} = %g" %  C_PF)
-    info_green("(3.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
-    info_green("(3.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
+    info_green("(4.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
+    info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
     return dr_glob_p1, r_loc_p1, ee_p1, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_b
 
@@ -188,7 +186,7 @@ def compute_local_liftings(p, P1, f, S):
         # Compute local norm of residual
         r_norm_loc_a = sobolev_norm(r, p)**p
         r_norm_loc += r_norm_loc_a
-        scale = (mesh.topology().dim() + 1) / sum(c.volume() for c in cells(v))
+        scale = 1.0 / sum(c.volume() for c in cells(v))
         r_loc_p1_dofs[v2d[v.index()]] = r_norm_loc_a * scale
         log(18, r"||\nabla r_a||_p = %g" % r_norm_loc_a**(1.0/p))
 
@@ -200,7 +198,8 @@ def compute_local_liftings(p, P1, f, S):
     # Recover original verbosity
     set_log_level(old_log_level)
 
-    # Take q-root of sum finally
+    # Scale by 1/N and take q-root of sum finally
+    r_norm_loc /= mesh.topology().dim() + 1
     q = p/(p-1)
     r_norm_loc **= 1.0/q
 
@@ -215,7 +214,7 @@ def compute_cellwise_grad(r, p, mesh_fine=None):
     r"""Return fine and coarse P0 functions representing cell-wise
     L^p norm of grad(r), i.e. functions having values
 
-        ||\nabla r||_{p, K} \frac{d+1}{|K|}
+        ||\nabla r||_{p, K} \frac{1}{|K|}
 
     on cell K. First (fine) function is defined on (fine) cells of r;
     second (coarse) function is reduction to coarse mesh (obtained from
@@ -223,7 +222,7 @@ def compute_cellwise_grad(r, p, mesh_fine=None):
 
     Scaling is chosen such that
 
-        \int D = (d+1) ||\nabla r||_p^p
+        \int D = ||\nabla r||_p^p
 
     for both returned functions D.
     """
@@ -231,10 +230,6 @@ def compute_cellwise_grad(r, p, mesh_fine=None):
     mesh_fine = mesh_fine or r.function_space().mesh()
     P0_fine = FunctionSpace(mesh_fine, 'Discontinuous Lagrange', 0)
     dr_fine = project((grad(r)**2)**Constant(0.5*p), P0_fine)
-
-    # Some scaling
-    N = mesh_fine.topology().dim() + 1 # vertices per cell
-    dr_fine.vector().__imul__(N)
 
     # Special case
     mesh_coarse = mesh_fine.root_node()
@@ -338,7 +333,7 @@ def format_result(*args):
     assert isinstance(args[2], int)
     assert all(isinstance(args[i], float) for i in [1]+range(3, 8))
     print("#RESULT name, p, num_cells, C_{cont,PF}, " \
-          "N^{-1/q}||E_glob||_q, ||E_loc||_q, Eff_(4.8a), Eff_(4.8b)")
+          "||E_glob||_q, ||E_loc||_q, Eff_(4.8a), Eff_(4.8b)")
     print("RESULT %s %s %s %.3f %.4f %.4f %.1f %.2f" % args)
 
 

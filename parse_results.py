@@ -16,7 +16,7 @@ prolog = r"""\begin{table}[b]
 case
 & \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
 & $\norm{{\cal E}_\mathrm{glob}}_q$
-& $\cred{N^\fq}\norm{{\cal E}_\mathrm{loc}}_q$
+& $\norm{{\cal E}_\mathrm{loc}}_q$
 & $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_1}}}$
 & $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_2}}}$
 \\\hline\hline
@@ -54,19 +54,6 @@ for log in logs:
     else:
         vals = results[key] = []
     vals.append(tuple(val))
-
-# Adjust slightly scaling of local lifting column
-prolog = prolog.replace(r"\cred{N^\fq}", "")
-for k in results.keys():
-    for i in range(len(results[k])):
-        val = float(results[k][i][3])
-        N = 3
-        p = float(k[1])
-        q = p/(p-1.0)
-        val *= N**(-1.0/q)
-        old_row = results[k][i]
-        new_row = old_row[:3]+('%.4f'%val,)+old_row[4:]
-        results[k][i] = new_row
 
 # Compile tabular code using results
 output = prolog
