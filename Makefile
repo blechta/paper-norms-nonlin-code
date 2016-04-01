@@ -1,6 +1,6 @@
 DOCKER_IMG=quay.io/blechta/fenics-dev:paper0
 DOCKER_CACHE=instant-cache
-DOCKER_RUN=docker run --volumes-from instant-cache --rm \
+DOCKER_RUN=docker run --volumes-from $(DOCKER_CACHE) --rm \
 		   -v $(shell pwd):/home/fenics/work -w /home/fenics/work \
 		   $(DOCKER_IMG) "sudo /bin/bash -l -c '$(CMD)'"
 
@@ -23,6 +23,8 @@ LOGS= \
 
 .PHONY: all init-docker clean-all clean-local clean-cache clean-docker
 
+.PRECIOUS: %.log
+
 all: tabular.tex
 
 tabular.tex: parse_results.py $(LOGS)
@@ -34,16 +36,16 @@ tabular.tex: parse_results.py $(LOGS)
 
 init-docker:
 	docker history -q $(DOCKER_IMG) >/dev/null 2>&1 || docker pull $(DOCKER_IMG)
-	docker inspect $(DOCKER_CACHE)  >/dev/null 2>&1 || \
-	    docker create -v /home/fenics/.instant --name instant-cache $(DOCKER_IMG) /bin/true
+	docker inspect $(DOCKER_CACHE) >/dev/null 2>&1 || \
+	    docker create -v /home/fenics/.instant --name $(DOCKER_CACHE) $(DOCKER_IMG) /bin/true
 
 clean-all: clean-local clean-docker
 
 clean-local:
-	rm -f $(LOGS) tabular.tex
+	rm -f $(LOGS) *.pdf tabular.tex
 
 clean-cache:
-	docker rm instant-cache || true
+	docker rm $(DOCKER_CACHE) >/dev/null 2>&1 || true
 
 clean-docker: clean-cache
-	docker rmi $(DOCKER_IMG)
+	docker rmi $(DOCKER_IMG) >/dev/null 2>&1 || true
