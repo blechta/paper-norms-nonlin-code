@@ -1,11 +1,10 @@
 DOCKER_IMG=quay.io/blechta/fenics-dev:paper0
-DOCKER_INIT=docker create -v /home/fenics/.instant --name instant-cache \
-	       $(DOCKER_IMG) /bin/true 2>/dev/null || true
+DOCKER_CACHE=instant-cache
 DOCKER_RUN=docker run --volumes-from instant-cache --rm \
 		   -v $(shell pwd):/home/fenics/work -w /home/fenics/work \
 		   $(DOCKER_IMG) "sudo /bin/bash -l -c '$(CMD)'"
 
-INIT=$(DOCKER_INIT)
+INIT=init-docker
 RUNNER=$(DOCKER_RUN)
 
 LOGS= \
@@ -22,17 +21,21 @@ LOGS= \
     ChaillouSuri_1.5_15.log \
     ChaillouSuri_1.5_20.log
 
-.PHONY: all
+.PHONY: all init-docker clean-all clean-local clean-cache clean-docker
 
 all: tabular.tex
 
 tabular.tex: parse_results.py $(LOGS)
 	python $< > $@
 
-%.log: main.py
-	$(eval CMD=python $< $(subst _, ,$*) 2>&1 > $@ || true)
-	$(INIT)
+%.log: main.py $(INIT)
+	$(eval CMD=python $< $(subst _, ,$*) >$@ 2>&1 || true)
 	$(RUNNER)
+
+init-docker:
+	docker history -q $(DOCKER_IMG) >/dev/null 2>&1 || docker pull $(DOCKER_IMG)
+	docker inspect $(DOCKER_CACHE)  >/dev/null 2>&1 || \
+	    docker create -v /home/fenics/.instant --name instant-cache $(DOCKER_IMG) /bin/true
 
 clean-all: clean-local clean-docker
 
