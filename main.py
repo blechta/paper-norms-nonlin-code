@@ -314,7 +314,7 @@ def distribute_p0_to_p1(f, out=None):
 
 
 def plot_liftings(glob, loc, ee, prefix):
-    path = ""
+    path = "./"
     mkdir_p(path)
     # Plot global and local lifting norms on patches
     plot_alongside(glob, loc, mode="color", shading="flat", edgecolors="k")
