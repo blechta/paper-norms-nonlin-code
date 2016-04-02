@@ -1,4 +1,4 @@
-DOCKER_IMG=quay.io/blechta/fenics-dev:paper0
+DOCKER_IMG=quay.io/blechta/dolfin-tape:paper0
 DOCKER_CACHE=instant-cache
 DOCKER_RUN=docker run --volumes-from $(DOCKER_CACHE) --rm \
 		   -v $(shell pwd):/home/fenics/work -w /home/fenics/work \

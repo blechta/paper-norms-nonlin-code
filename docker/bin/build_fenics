@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -e
+
+PYTHON="${PYTHON:-python}"
+FENICS_BUILD_TYPE="${FENICS_BUILD_TYPE:-Release}"
+
+if [ -z "$SRC_DIR" ]; then
+    echo "SRC_DIR must be defined" >&2
+    exit -1
+fi
+
+if [ -z "${FENICS_HOME}" ]; then
+    echo "FENICS_HOME must be defined" >&2
+    exit -1
+fi
+
+function build_cmake () {
+    # build a project with cmake (dolfin, mshr)
+    project="$1"
+    echo "FENICS-BUILDER: Building $project with CMake..."
+    
+    build="$SRC_DIR/$project/build"
+    test -d "$build" && rm -r "$build"
+    mkdir -p "$build"
+    cd "$build"
+    cmake ../ -DCMAKE_INSTALL_PREFIX=${FENICS_HOME} -DCMAKE_BUILD_TYPE=${FENICS_BUILD_TYPE} -DPYTHON_EXECUTABLE:FILEPATH=${FENICS_HOME}/bin/python -Wno-dev
+    make
+    make install
+}
+
+function build () {
+    for project in $@; do
+        echo "FENICS-BUILDER: Building $project..."
+        path="$SRC_DIR/$project"
+        if [ ! -d "$path" ]; then
+            echo "FENICS-BUILDER: $project source cannot be found at $path. Please run pull_fenics first."
+            exit -1
+        fi
+        if [ "$project" = "dolfin" -o "$project" = "mshr" ]; then
+            build_cmake "$project"
+            continue
+        fi
+        cd "$path"
+        ${PYTHON} setup.py install --prefix=${FENICS_HOME}
+    done
+}
+
+if [ -z "$1" ]; then
+    build fiat instant ufl ffc dolfin mshr
+else
+    build $@
+fi
+
