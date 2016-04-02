@@ -21,14 +21,15 @@ On Linux machine with Docker installed, typing
 
 will
 
-* download Docker image https://quay.io/blechta/dolfin-tape:paper0
+* download Docker image
+  https://quay.io/blechta/dolfin-tape@sha256:39d435c6d722f1de582a1ddc79b203d866b0c53e99fd76614d349236ba1d56c6
   containing necessary software stack (PETSc, FEniCS, dolfin-tape);
-  the image can be rebuild using the files in ``docker`` directory,
+  the image can be rebuilt using the files in ``docker`` directory,
 
 * run simulations in the Docker containers to produce log files
   and pdf figures,
 
-* postprocess log files and write out tabular.tex.
+* postprocess log files and write out ``tabular.tex``.
 
 Type :code:`make -j2` to run 2 jobs in parallel, or :code:`make -j12` to run
 all twelve test cases in parallel. Note that the biggest test case needs around

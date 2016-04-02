@@ -7,7 +7,7 @@
 #
 # Prebuilt image is stored at:
 #
-#    https://quay.io/blechta/dolfin-tape:paper0
+#    https://quay.io/blechta/dolfin-tape@sha256:39d435c6d722f1de582a1ddc79b203d866b0c53e99fd76614d349236ba1d56c6
 #
 # Authors:
 # Jack S. Hale <jack.hale@uni.lu>
