@@ -327,6 +327,29 @@ def plot_liftings(glob, loc, ee, prefix):
     pyplot.savefig(os.path.join(path, prefix+"_ee_w.pdf"))
 
 
+def plot_cutoff_distribution(p, mesh, prefix):
+    """Plot distribution of Poincate-Friedrichs cutoff constant
+    across mesh patches
+    """
+    # Compute cutoff constants and assemble P1 function
+    P1 = FunctionSpace(mesh, 'Lagrange', 1)
+    dist = Function(P1)
+    vec = dist.vector()
+    v2d = vertex_to_dof_map(P1)
+    for v in vertices(mesh):
+        vec[v2d[v.index()]] = poincare_friedrichs_cutoff(v, p)
+
+    # Plot
+    path = "./"
+    mkdir_p(path)
+    plot_alongside(dist, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_cutoff_f.pdf"))
+    plot_alongside(dist, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_cutoff_g.pdf"))
+    plot_alongside(dist, mode="warp", range_min=0.0)
+    pyplot.savefig(os.path.join(path, prefix+"_cutoff_w.pdf"))
+
+
 def format_result(*args):
     assert len(args) == 8
     assert isinstance(args[0], str) and len(args[0].split()) == 1
@@ -343,6 +366,7 @@ def test_ChaillouSuri(p, N):
     # Fetch exact solution and rhs of p-Laplacian
     mesh = UnitSquareMesh(N, N, 'crossed')
     print("num cells %s" % mesh.num_cells())
+    plot_cutoff_distribution(p, mesh, 'ChaillouSuri_%s_%02d' % (p, N))
     u, f = pLaplace_ChaillouSuri(p, domain=mesh, degree=4)
 
     # Now the heavy lifting
@@ -366,6 +390,7 @@ def test_CarstensenKlose(p, N):
     mesh = mshr.generate_mesh(b0 - b1, N)
     mesh = mesh_fixup(mesh)
     print("num cells %s" % mesh.num_cells())
+    plot_cutoff_distribution(p, mesh, 'CarstensenKlose_%s_%02d' % (p, N))
 
     # Fetch exact solution and rhs of p-Laplacian
     u, f = pLaplace_CarstensenKlose(p=p, eps=0.0, delta=7.0/8,
