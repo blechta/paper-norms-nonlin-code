@@ -2,6 +2,9 @@
 Localization of :math:`W^{-1,q}` norm for local a posteriori efficiency
 =======================================================================
 
+.. image:: https://zenodo.org/badge/21218/blechta/paper-norms-nonlin-code.svg
+   :target: https://zenodo.org/badge/latestdoi/21218/blechta/paper-norms-nonlin-code
+
 This repository contains a code to reproduce numerical simulations
 of the paper
 
