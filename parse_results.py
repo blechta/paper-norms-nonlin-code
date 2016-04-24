@@ -11,27 +11,27 @@ prefix = ""
 # Snippets for LaTeX tabular
 prolog = r"""\begin{table}[b]
 \centering
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrr}
 %
-case
+Case
 & \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
-& $\norm{{\cal E}_\mathrm{glob}}_q$
-& $\norm{{\cal E}_\mathrm{loc}}_q$
-& $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_1}}}$
-& $\mathrm{Eff_{\eqref{eq_lift_norm_equiv_2}}}$
+& $\norm{\res_\mathrm{glob}}_q$
+& $\norm{\res_\mathrm{loc}}_q$
+& $\mathrm{Eff_{\eqref{eq_loc_dual_gal_1}}}$
+& $\mathrm{Eff_{\eqref{eq_loc_dual_gal_impr_1}}}$
+& $\mathrm{Eff_{\eqref{eq_loc_dual_gal_2}}}$
 \\\hline\hline
 %
 """
 mrow_begin = r"\multirow{%s}{*}{\parbox{3cm}{\centering %s $p=%s$, $N=3$}}" + os.linesep
-row = r"& %s & %s & %s & %s & %s & %s \\" + os.linesep
+row = r"& %s & %s & %s & %s & %s & %s & %s \\" + os.linesep
 mrow_end = r"\hline" + os.linesep
 epilog = r"""\end{tabular}
-\caption{Quantities of localization inequalities~\eqref{eq_lift_norm_equiv}
-         (approximating~\eqref{eq_loc_dual_gal_2}, \eqref{eq_loc_dual_gal_1})
-         for chosen model problems.}
+\caption{Computed quantities of localization inequalities~\eqref{eq_loc_dual_gal_1},
+         \eqref{eq_loc_dual_gal_impr_1}, and \eqref{eq_loc_dual_gal_2}
+         for the chosen model problems.}
 \label{tab_loc}
-\end{table}
-"""
+\end{table}"""
 
 # Read line tagged with 'RESULT' from logs
 results = {}

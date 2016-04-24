@@ -93,7 +93,7 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     assert np.isclose(assemble(dr_glob_p1    *dx), r_norm_glob**q)
 
     # Compute local liftings
-    r_norm_loc, r_loc_p1 = compute_local_liftings(p, V, f, S)
+    r_norm_loc, r_norm_loc_PF, r_loc_p1 = compute_local_liftings(p, V, f, S)
 
     # Compute energy error
     if exact_solution:
@@ -113,7 +113,9 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     C_PF = poincare_friedrichs_cutoff(mesh, p)
     ratio_a = ( N * C_PF * r_norm_loc ) / r_norm_glob
     ratio_b = r_norm_glob / r_norm_loc
+    ratio_a_PF = ( N * r_norm_loc_PF ) / r_norm_glob
     assert ratio_a >= 1.0 and ratio_b >= 1.0
+    assert ratio_a_PF >= 1.0
 
     # Report
     info_blue(r"||\nabla r||_p^{p-1} = %g, ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q} = %g"
@@ -122,7 +124,7 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     info_green("(4.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
-    return dr_glob_p1, r_loc_p1, ee_p1, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_b
+    return dr_glob_p1, r_loc_p1, ee_p1, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -161,6 +163,7 @@ def compute_local_liftings(p, P1, f, S):
     r_loc_p1_dofs = r_loc_p1.vector()
     v2d = vertex_to_dof_map(P1)
     r_norm_loc = 0.0
+    r_norm_loc_PF = 0.0
 
     # Adjust verbosity
     old_log_level = get_log_level()
@@ -186,6 +189,7 @@ def compute_local_liftings(p, P1, f, S):
         # Compute local norm of residual
         r_norm_loc_a = sobolev_norm(r, p)**p
         r_norm_loc += r_norm_loc_a
+        r_norm_loc_PF += r_norm_loc_a * poincare_friedrichs_cutoff(v, p)**(p/(p-1))
         scale = 1.0 / sum(c.volume() for c in cells(v))
         r_loc_p1_dofs[v2d[v.index()]] = r_norm_loc_a * scale
         log(18, r"||\nabla r_a||_p = %g" % r_norm_loc_a**(1.0/p))
@@ -200,14 +204,16 @@ def compute_local_liftings(p, P1, f, S):
 
     # Scale by 1/N and take q-root of sum finally
     r_norm_loc /= mesh.topology().dim() + 1
+    r_norm_loc_PF /= mesh.topology().dim() + 1
     q = p/(p-1)
     r_norm_loc **= 1.0/q
+    r_norm_loc_PF **= 1.0/q
 
     # Sanity check
     e_norm = assemble(r_loc_p1*dx)
     assert np.isclose(e_norm, r_norm_loc**q)
 
-    return r_norm_loc, r_loc_p1
+    return r_norm_loc, r_norm_loc_PF, r_loc_p1
 
 
 def compute_cellwise_grad(r, p, mesh_fine=None):
@@ -351,13 +357,13 @@ def plot_cutoff_distribution(p, mesh, prefix):
 
 
 def format_result(*args):
-    assert len(args) == 8
+    assert len(args) == 9
     assert isinstance(args[0], str) and len(args[0].split()) == 1
     assert isinstance(args[2], int)
-    assert all(isinstance(args[i], float) for i in [1]+range(3, 8))
+    assert all(isinstance(args[i], float) for i in [1]+range(3, 9))
     print("#RESULT name, p, num_cells, C_{cont,PF}, " \
           "||E_glob||_q, ||E_loc||_q, Eff_(4.8a), Eff_(4.8b)")
-    print("RESULT %s %s %s %.3f %.4f %.4f %.1f %.2f" % args)
+    print("RESULT %s %s %4d %.3f %.4f %.4f %.1f %.1f %.2f" % args)
 
 
 def test_ChaillouSuri(p, N):
@@ -374,7 +380,7 @@ def test_ChaillouSuri(p, N):
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
-    format_result('Chaillou-Suri', p, mesh.num_cells(), *result[3:])
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
     plot_liftings(glob, loc, ee, 'ChaillouSuri_%s_%02d' % (p, N))
     list_timings(TimingClear_clear, [TimingType_wall])
 
@@ -408,7 +414,7 @@ def test_CarstensenKlose(p, N):
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
-    format_result('Carstensen-Klose', p, mesh.num_cells(), *result[3:])
+    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[3:])
     plot_liftings(glob, loc, ee, 'CarstensenKlose_%s_%02d' % (p, N))
     list_timings(TimingClear_clear, [TimingType_wall])
 
