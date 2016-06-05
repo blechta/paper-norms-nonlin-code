@@ -15,8 +15,8 @@ prolog = r"""\begin{table}[b]
 %
 Case
 & \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
-& $\norm{\res_\mathrm{glob}}_q$
-& $\norm{\res_\mathrm{loc}}_q$
+& $\norm{\epsilon_\mathrm{glob}}_q$
+& $\norm{\epsilon_\mathrm{loc}}_q$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_1}}}$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_impr_1}}}$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_2}}}$
