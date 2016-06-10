@@ -443,8 +443,8 @@ def test_CarstensenKlose(p, N):
                                     domain=mesh, degree=4)
     # There are some problems with quadrature element,
     # see https://bitbucket.org/fenics-project/ffc/issues/84,
-    # so project to Lagrange element
-    f = project(f, FunctionSpace(mesh, 'Lagrange', 4),
+    # so precompute (f, vh) for vh from P1
+    f = project(f, FunctionSpace(mesh, 'Lagrange', 1),
                 form_compiler_parameters=
                     {'quadrature_degree': f.ufl_element().degree()})
     f.set_allow_extrapolation(True)
