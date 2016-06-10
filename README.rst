@@ -57,7 +57,7 @@ You will need
 |  FFC           4dc648a466ad087448a41921ade005f114e41268
 |  DOLFIN        fcf70d934d63168e5ed037678e22ac66fb2b3474
 |  mshr          7447149c972977ff8ce2e89283d1ed0525fa2bc6
-|  dolfin-tape   02fd4ddd583328a878593d1bf36769df12306d53
+|  dolfin-tape   0cbd43e9e7570d1b723ca9824d18030a4279d004
 |  matplotlib    1.3.1
 
 
