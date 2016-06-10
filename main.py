@@ -43,7 +43,7 @@ not_working_in_parallel('This')
 parameters['form_compiler']['optimize'] = True
 
 
-def compute_liftings(p, mesh, f, exact_solution=None):
+def compute_liftings(name, p, mesh, f, exact_solution=None):
     r"""Find approximation to p-Laplace problem with rhs f,
     and compute global and local liftings of the residual.
     Return tuple (
@@ -69,6 +69,9 @@ def compute_liftings(p, mesh, f, exact_solution=None):
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: Est_eps <= 1e-6*Est_tot
     u = solve_p_laplace_adaptive(p, criterion, V, f,
                                  zero(mesh.geometry().dim()), exact_solution)
+
+    # Plot exact solution, approximation and error
+    plot_error(exact_solution, u, name)
 
     # p-Laplacian flux of u
     S = inner(grad(u), grad(u))**(0.5*Constant(p)-1.0) * grad(u)
@@ -317,13 +320,17 @@ def distribute_p0_to_p1(f, out=None):
 def plot_liftings(glob, loc, ee, prefix):
     path = "./"
     mkdir_p(path)
+
     # Plot global and local lifting norms on patches
     plot_alongside(glob, loc, mode="color", shading="flat", edgecolors="k")
-    pyplot.savefig(os.path.join(path, prefix+"_f.pdf"))
+    pyplot.savefig(os.path.join(path, prefix+"_r_f.pdf"))
     plot_alongside(glob, loc, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_g.pdf"))
+    pyplot.savefig(os.path.join(path, prefix+"_r_g.pdf"))
     plot_alongside(glob, loc, mode="warp", range_min=0.0)
-    pyplot.savefig(os.path.join(path, prefix+"_w.pdf"))
+    pyplot.savefig(os.path.join(path, prefix+"_r_w.pdf"))
+    plot_alongside(glob, loc, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_r_c.pdf"))
+
     # Plot global lifting and energy error norms on patches
     plot_alongside(glob, ee, common_cbar=False, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_ee_f.pdf"))
@@ -331,6 +338,35 @@ def plot_liftings(glob, loc, ee, prefix):
     pyplot.savefig(os.path.join(path, prefix+"_ee_g.pdf"))
     plot_alongside(glob, ee, common_cbar=False, mode="warp", range_min=0.0)
     pyplot.savefig(os.path.join(path, prefix+"_ee_w.pdf"))
+    plot_alongside(glob, ee, common_cbar=False, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_ee_c.pdf"))
+
+
+def plot_error(u, uh, prefix):
+    path = "./"
+    mkdir_p(path)
+
+    # Plot exact solution and approximation
+    u = project(u, uh.function_space())
+    plot_alongside(u, uh, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_u_f.pdf"))
+    plot_alongside(u, uh, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_u_g.pdf"))
+    plot_alongside(u, uh, mode="warp")
+    pyplot.savefig(os.path.join(path, prefix+"_u_w.pdf"))
+    plot_alongside(u, uh, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_u_c.pdf"))
+
+    # Plot error
+    e = project(u-uh, uh.function_space())
+    plot_alongside(e, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_e_f.pdf"))
+    plot_alongside(e, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_e_g.pdf"))
+    plot_alongside(e, mode="warp")
+    pyplot.savefig(os.path.join(path, prefix+"_e_w.pdf"))
+    plot_alongside(e, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_e_c.pdf"))
 
 
 def plot_cutoff_distribution(p, mesh, prefix):
@@ -369,19 +405,21 @@ def format_result(*args):
 def test_ChaillouSuri(p, N):
     from dolfintape.demo_problems.exact_solutions import pLaplace_ChaillouSuri
 
+    label = 'ChaillouSuri_%s_%02d' % (p, N)
+
     # Fetch exact solution and rhs of p-Laplacian
     mesh = UnitSquareMesh(N, N, 'crossed')
     print("num cells %s" % mesh.num_cells())
-    plot_cutoff_distribution(p, mesh, 'ChaillouSuri_%s_%02d' % (p, N))
+    plot_cutoff_distribution(p, mesh, label)
     u, f = pLaplace_ChaillouSuri(p, domain=mesh, degree=4)
 
     # Now the heavy lifting
-    result = compute_liftings(p, mesh, f, u)
+    result = compute_liftings(label, p, mesh, f, u)
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
     format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, 'ChaillouSuri_%s_%02d' % (p, N))
+    plot_liftings(glob, loc, ee, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -390,13 +428,15 @@ def test_CarstensenKlose(p, N):
     from dolfintape.mesh_fixup import mesh_fixup
     import mshr
 
+    label = 'CarstensenKlose_%s_%02d' % (p, N)
+
     # Build mesh on L-shaped domain (-1, 1)^2 \ (0, 1)*(-1, 0)
     b0 = mshr.Rectangle(Point(-1.0, -1.0), Point(1.0, 1.0))
     b1 = mshr.Rectangle(Point(0.0, -1.0), Point(1.0, 0.0))
     mesh = mshr.generate_mesh(b0 - b1, N)
     mesh = mesh_fixup(mesh)
     print("num cells %s" % mesh.num_cells())
-    plot_cutoff_distribution(p, mesh, 'CarstensenKlose_%s_%02d' % (p, N))
+    plot_cutoff_distribution(p, mesh, label)
 
     # Fetch exact solution and rhs of p-Laplacian
     u, f = pLaplace_CarstensenKlose(p=p, eps=0.0, delta=7.0/8,
@@ -410,12 +450,12 @@ def test_CarstensenKlose(p, N):
     f.set_allow_extrapolation(True)
 
     # Now the heavy lifting
-    result = compute_liftings(p, mesh, f, u)
+    result = compute_liftings(label, p, mesh, f, u)
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
     format_result('Carstensen--Klose', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, 'CarstensenKlose_%s_%02d' % (p, N))
+    plot_liftings(glob, loc, ee, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
