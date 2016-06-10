@@ -25,7 +25,7 @@ On Linux machine with Docker installed, typing
 will
 
 * download Docker image
-  https://quay.io/blechta/dolfin-tape@sha256:39d435c6d722f1de582a1ddc79b203d866b0c53e99fd76614d349236ba1d56c6
+  https://quay.io/blechta/dolfin-tape@sha256:5073d007412fd90e3a68e5c84222dbbd8a6651c773535fd7324e9011aca674bb
   containing necessary software stack (PETSc, FEniCS, dolfin-tape);
   the image can be rebuilt using the files in ``docker`` directory,
 
