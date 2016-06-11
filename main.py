@@ -143,7 +143,8 @@ def compute_global_lifting(p, mesh, f, S):
     # Compute lifting adaptively
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: \
         Est_eps <= 1e-2*Est_tot and Est_tot <= 1e-2*sobolev_norm(u_h, p)**(p-1.0)
-    r_glob = solve_p_laplace_adaptive(p, criterion, V_high, f, S)
+    r_glob = solve_p_laplace_adaptive(p, criterion, V_high, f, S,
+            solver_parameters={"newton_solver": {"linear_solver": "mumps"}})
 
     # Rollback side-effect
     parameters['form_compiler']['quadrature_degree'] = -1
