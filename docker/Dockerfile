@@ -2,8 +2,8 @@
 # dolfin-tape to reproduce numerical experiments of the paper
 #
 #   Jan Blechta, Josef Malek, and Martin Vohralik.
-#   Localization of $W^{-1,q}$ norm for local a posteriori efficiency.
-#   In preparation, 2016.
+#   Localization of the $W^{-1,q}$ norm for local a posteriori efficiency.
+#   Submitted, 2016. URL https://hal.inria.fr/hal-01332481.
 #
 # Prebuilt image is stored at:
 #

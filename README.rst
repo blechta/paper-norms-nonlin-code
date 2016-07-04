@@ -1,6 +1,6 @@
-=======================================================================
-Localization of :math:`W^{-1,q}` norm for local a posteriori efficiency
-=======================================================================
+===========================================================================
+Localization of the :math:`W^{-1,q}` norm for local a posteriori efficiency
+===========================================================================
 
 .. image:: https://zenodo.org/badge/21218/blechta/paper-norms-nonlin-code.svg
    :target: https://zenodo.org/badge/latestdoi/21218/blechta/paper-norms-nonlin-code
@@ -9,8 +9,8 @@ This repository contains a code to reproduce numerical simulations
 of the paper
 
   Jan Blechta, Josef Málek, and Martin Vohralík.
-  Localization of :math:`W^{-1,q}` norm for local a posteriori efficiency.
-  In preparation, 2016.
+  Localization of the :math:`W^{-1,q}` norm for local a posteriori efficiency.
+  Submitted, 2016. URL https://hal.inria.fr/hal-01332481.
 
 
 Usage
@@ -36,8 +36,9 @@ will
 
 Type :code:`make -j2` to run 2 jobs in parallel, or :code:`make -j12` to run
 all twelve test cases in parallel. Note that the biggest test case needs around
-20GB of RAM and 15 core-hours.  Completely parallel run ``-j12`` should be
-possible with cca 40GB in cca 45 core-hours.
+30GB of RAM and 30 core-hours. Completely parallel run ``-j12`` should be
+possible with cca 60GB in cca 60 core-hours. Note that most of the cases can
+be computed in few hours and less than 8GB of memory.
 
 Run
 

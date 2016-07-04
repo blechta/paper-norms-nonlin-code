@@ -18,8 +18,9 @@
 """This script finds an approximation of p-Laplace problem and then uses
 its residual in W^{-1,q} to demonstrate localization result of
 
-    [J. Blechta, J. M\'alek, M. Vohral\'ik, Localization of $W^{-1,q}$
-    norm for local a posteriori efficiency, in preparation, 2016.]
+    J. Blechta, J. M\'alek, M. Vohral\'ik, Localization of the $W^{-1,q}$
+    norm for local a posteriori efficiency. Submitted, 2016.
+    URL https://hal.inria.fr/hal-01332481.
 """
 
 from __future__ import print_function
