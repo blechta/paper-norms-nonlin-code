@@ -69,7 +69,8 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     V = FunctionSpace(mesh, 'Lagrange', 1)
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: Est_eps <= 1e-6*Est_tot
     u = solve_p_laplace_adaptive(p, criterion, V, f,
-                                 zero(mesh.geometry().dim()), exact_solution)
+                                 zero(mesh.geometry().dim()), exact_solution,
+                                 eps0=0.0)
 
     # Plot exact solution, approximation and error
     plot_error(exact_solution, u, name)
@@ -457,6 +458,54 @@ def test_CarstensenKlose(p, N):
 
     # Report
     format_result('Carstensen--Klose', p, mesh.num_cells(), *result[3:])
+    plot_liftings(glob, loc, ee, label)
+    list_timings(TimingClear_clear, [TimingType_wall])
+
+
+def test_NicaiseVenel(p, N):
+    assert p == 2
+    label = 'NicaiseVenel_%s_%02d' % (p, N)
+
+    # Fetch exact solution and rhs of p-Laplacian
+    assert N % 2 == 0
+    mesh = UnitSquareMesh(N, N, 'crossed')
+    mesh.coordinates()[:] *= 2
+    mesh.coordinates()[:] += (-1, -1)
+    cf = CellFunction('size_t', mesh)
+    AutoSubDomain(lambda x: x[0] <= +DOLFIN_EPS).mark(cf, 0)
+    AutoSubDomain(lambda x: x[0] >= -DOLFIN_EPS).mark(cf, 1)
+
+    # FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+    # There's now hardcoded value of sigma_minus in dolfintape! Be careful!
+    # FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+    sigma_minus = -1./3
+    # FIXME: Use new martinal's functionality: cell functions in cpp exprs
+    u = Expression("x[0] > 0.0 ? "
+                   "sigma_minus*x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)"
+                   " : "
+                   "x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)",
+                   sigma_minus=sigma_minus, degree=5, domain=mesh)
+    f = Expression("-sigma_minus*2.0*x[0]*((x[0]+1)*(x[0]-1)+3.0*(x[1]+1)*(x[1]-1))",
+                   sigma_minus=sigma_minus, degree=3, domain=mesh)
+
+    #pyplot.figure()
+    #plot(cf)
+    #pyplot.show()
+    #plot(u, mesh=mesh, mode="warp")
+    #pyplot.show()
+    #plot(f, mesh=mesh, mode="warp")
+    #pyplot.show()
+    #exit()
+
+    print("num cells %s" % mesh.num_cells())
+    plot_cutoff_distribution(p, mesh, label)
+
+    # Now the heavy lifting
+    result = compute_liftings(label, p, mesh, f, u)
+    glob, loc, ee = result[0], result[1], result[2]
+
+    # Report
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
     plot_liftings(glob, loc, ee, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
