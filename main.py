@@ -40,6 +40,7 @@ not_working_in_parallel('This')
 
 # UFLACS issue #49
 #parameters['form_compiler']['representation'] = 'uflacs'
+parameters['form_compiler']['representation'] = 'quadrature'
 
 parameters['form_compiler']['optimize'] = True
 
