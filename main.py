@@ -45,7 +45,7 @@ parameters['form_compiler']['representation'] = 'quadrature'
 parameters['form_compiler']['optimize'] = True
 
 
-def compute_liftings(name, p, mesh, f, exact_solution=None):
+def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
     r"""Find approximation to p-Laplace problem with rhs f,
     and compute global and local liftings of the residual.
     Return tuple (
@@ -69,19 +69,31 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     log(25, 'Computing residual of p-Laplace problem')
     V = FunctionSpace(mesh, 'Lagrange', 1)
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: Est_eps <= 1e-6*Est_tot
-    u = solve_p_laplace_adaptive(p, criterion, V, f,
-                                 zero(mesh.geometry().dim()), exact_solution,
-                                 eps0=0.0)
+    u = solve_p_laplace_adaptive(p, criterion, V, f, S,
+                                 u_ex=exact_solution, eps0=0.0)
 
     # Plot exact solution, approximation and error
     plot_error(exact_solution, u, name)
 
-    # p-Laplacian flux of u
-    S = inner(grad(u), grad(u))**(0.5*Constant(p)-1.0) * grad(u)
+    # Default to p-Laplacian flux of u
+    if S is None:
+        def createResidualFlux(p, u):
+            def _S(r, eps):
+                return (eps + inner(grad(r), grad(r)))**(0.5*Constant(p)-1.0) * grad(r) \
+                    + inner(grad(u), grad(u))**(0.5*Constant(p)-1.0) * grad(u)
+            return _S
+        R = createResidualFlux(p, u)
+    else:
+        def createResidualFlux(p, u):
+            def _S(r, eps):
+                return (eps + inner(grad(r), grad(r)))**(0.5*Constant(p)-1.0) * grad(r) \
+                    + S(u, eps)
+            return _S
+        R = createResidualFlux(p, u)
 
     # Global lifting of W^{-1, p'} functional R = f + div(S)
     u.set_allow_extrapolation(True) # Needed hack
-    r_glob = compute_global_lifting(p, mesh, f, S)
+    r_glob = compute_global_lifting(p, mesh, f, R)
     u.set_allow_extrapolation(False)
 
     # Compute cell-wise norm of global lifting
@@ -99,7 +111,7 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     assert np.isclose(assemble(dr_glob_p1    *dx), r_norm_glob**q)
 
     # Compute local liftings
-    r_norm_loc, r_norm_loc_PF, r_loc_p1 = compute_local_liftings(p, V, f, S)
+    r_norm_loc, r_norm_loc_PF, r_loc_p1 = compute_local_liftings(p, V, f, R)
 
     # Compute energy error
     if exact_solution:
@@ -463,9 +475,9 @@ def test_CarstensenKlose(p, N):
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
-def test_NicaiseVenel(p, N):
-    assert p == 2
-    label = 'NicaiseVenel_%s_%02d' % (p, N)
+def test_NicaiseVenel(sigma_minus, N):
+    p = 2
+    label = 'NicaiseVenel_%s_%02d' % (sigma_minus, N)
 
     # Fetch exact solution and rhs of p-Laplacian
     assert N % 2 == 0
@@ -476,11 +488,11 @@ def test_NicaiseVenel(p, N):
     AutoSubDomain(lambda x: x[0] <= +DOLFIN_EPS).mark(cf, 0)
     AutoSubDomain(lambda x: x[0] >= -DOLFIN_EPS).mark(cf, 1)
 
-    # FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
-    # There's now hardcoded value of sigma_minus in dolfintape! Be careful!
-    # FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
-    sigma_minus = -1./3
     # FIXME: Use new martinal's functionality: cell functions in cpp exprs
+    sigma = Expression("x[0] >= 0 ? 1.0 : sigma_minus",
+                       sigma_minus=sigma_minus, degree=0, domain=mesh)
+    def S(u, eps):
+        return sigma*grad(u)
     u = Expression("x[0] > 0.0 ? "
                    "sigma_minus*x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)"
                    " : "
@@ -502,11 +514,11 @@ def test_NicaiseVenel(p, N):
     plot_cutoff_distribution(p, mesh, label)
 
     # Now the heavy lifting
-    result = compute_liftings(label, p, mesh, f, u)
+    result = compute_liftings(label, p, mesh, f, u, S=S)
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
-    format_result('Nicaise--Venel', p, mesh.num_cells(), *result[3:])
+    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[3:])
     plot_liftings(glob, loc, ee, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
