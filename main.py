@@ -121,7 +121,7 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     ratio_b = r_norm_glob / r_norm_loc
     ratio_a_PF = ( N * r_norm_loc_PF ) / r_norm_glob
     assert ratio_a >= 1.0 and ratio_b >= 1.0
-    assert ratio_a_PF >= 1.0
+    #assert ratio_a_PF >= 1.0
 
     # Report
     info_blue(r"||\nabla r||_p^{p-1} = %g, ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q} = %g"
@@ -506,7 +506,7 @@ def test_NicaiseVenel(p, N):
     glob, loc, ee = result[0], result[1], result[2]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
+    format_result('Nicaise--Venel', p, mesh.num_cells(), *result[3:])
     plot_liftings(glob, loc, ee, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
