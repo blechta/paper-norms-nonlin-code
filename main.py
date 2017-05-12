@@ -333,6 +333,13 @@ def distribute_p0_to_p1(f, out=None):
     return out
 
 
+def function_ipow(fun, exponent):
+    "Take inplace power of function by powering its dofs"""
+    x = fun.vector()
+    # FIXME: PETSc VecPow would be faster
+    x[:] = x.array()**exponent
+
+
 def plot_liftings(glob, loc, ee, prefix):
     path = "./"
     mkdir_p(path)
@@ -516,6 +523,11 @@ def test_NicaiseVenel(sigma_minus, N):
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u, S=S)
     glob, loc, ee = result[0], result[1], result[2]
+
+    # Take square root of P1 functions (then they are no more polynomials...)
+    function_ipow(glob, 1.0/p)
+    function_ipow(loc, 1.0/p)
+    function_ipow(ee, 1.0/p)
 
     # Report
     format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[3:])
