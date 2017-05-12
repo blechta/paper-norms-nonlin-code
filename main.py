@@ -52,6 +52,7 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
         \sum_a ||\nabla r     ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla r^a   ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p \psi_a/|\omega_a|,
+        \sum_a \sum_{K\in\omega_a} \eta_K |K|/|\omega_a| \psi_a,
         C_{cont,PF},
         ||\nabla r||_p^{p-1},
         ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
@@ -69,8 +70,8 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
     log(25, 'Computing residual of p-Laplace problem')
     V = FunctionSpace(mesh, 'Lagrange', 1)
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: Est_eps <= 1e-6*Est_tot
-    u = solve_p_laplace_adaptive(p, criterion, V, f, S,
-                                 u_ex=exact_solution, eps0=0.0)
+    u, est_h, est_eps, est_tot = solve_p_laplace_adaptive(p, criterion, V, f, S,
+                                                          u_ex=exact_solution, eps0=0.0)
 
     # Plot exact solution, approximation and error
     plot_error(exact_solution, u, name)
@@ -142,7 +143,10 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
     info_green("(4.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
-    return dr_glob_p1, r_loc_p1, ee_p1, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
+    # Get P1 distribution of cell estimator
+    eta = distribute_cellfunction_to_p1(est_tot, Function(V))
+
+    return dr_glob_p1, r_loc_p1, ee_p1, eta, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -158,7 +162,7 @@ def compute_global_lifting(p, mesh, f, S):
     # Compute lifting adaptively
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: \
         Est_eps <= 1e-2*Est_tot and Est_tot <= 1e-2*sobolev_norm(u_h, p)**(p-1.0)
-    r_glob = solve_p_laplace_adaptive(p, criterion, V_high, f, S,
+    r_glob, _, _, _ = solve_p_laplace_adaptive(p, criterion, V_high, f, S,
             solver_parameters={"newton_solver": {"linear_solver": "mumps"}})
 
     # Rollback side-effect
@@ -202,7 +206,7 @@ def compute_local_liftings(p, P1, f, S):
         criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: \
             Est_eps <= 1e-2*Est_tot and Est_tot <= 1e-2*sobolev_norm(u_h, p)**(p-1.0)
         parameters['form_compiler']['quadrature_degree'] = 8
-        r = solve_p_laplace_adaptive(p, criterion, V_loc, f, S)
+        r, _, _, _ = solve_p_laplace_adaptive(p, criterion, V_loc, f, S)
         parameters['form_compiler']['quadrature_degree'] = -1
 
         # Compute local norm of residual
@@ -333,6 +337,42 @@ def distribute_p0_to_p1(f, out=None):
     return out
 
 
+def distribute_cellfunction_to_p1(f, out=None):
+    r"""Distribute cell function to P1 function s.t.
+
+        g = \sum_{a \in vertices} \sum_{K \ni a} f_K |K|/|\omega_a|
+
+    Returns P1 function g.
+    """
+    mesh = f.mesh()
+    if out is None:
+        P1 = FunctionSpace(mesh, 'Lagrange', 1)
+        out = Function(P1)
+    else:
+        P1 = out.function_space()
+
+    # Sanity check
+    assert isinstance(f, CellFunctionDouble)
+    assert P1.ufl_element().family() == 'Lagrange'
+    assert P1.ufl_element().degree() == 1
+    assert P1.ufl_element().value_shape() == ()
+
+    vec = out.vector()
+    v2d = vertex_to_dof_map(P1)
+
+    # Collect contribution from cells
+    for c in cells(mesh):
+        val = f[c]
+        for v in vertices(c):
+            # FIXME: it would be faster to assemble vector just once
+            vol_cell = c.volume()
+            vol_patch = sum(c.volume() for c in cells(v))
+            dof = v2d[v.index()]
+            vec[dof] = vec[dof][0] + val*vol_cell/vol_patch
+
+    return out
+
+
 def function_ipow(fun, exponent):
     "Take inplace power of function by powering its dofs"""
     x = fun.vector()
@@ -340,7 +380,7 @@ def function_ipow(fun, exponent):
     x[:] = x.array()**exponent
 
 
-def plot_liftings(glob, loc, ee, prefix):
+def plot_liftings(glob, loc, ee, eta, prefix):
     path = "./"
     mkdir_p(path)
 
@@ -363,6 +403,16 @@ def plot_liftings(glob, loc, ee, prefix):
     pyplot.savefig(os.path.join(path, prefix+"_ee_w.pdf"))
     plot_alongside(glob, ee, common_cbar=False, mode="contour")
     pyplot.savefig(os.path.join(path, prefix+"_ee_c.pdf"))
+
+    # Plot global lifting norm and error estimator on patches
+    plot_alongside(glob, eta, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_eta_f.pdf"))
+    plot_alongside(glob, eta, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_eta_g.pdf"))
+    plot_alongside(glob, eta, mode="warp", range_min=0.0)
+    pyplot.savefig(os.path.join(path, prefix+"_eta_w.pdf"))
+    plot_alongside(glob, eta, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_eta_c.pdf"))
 
 
 def plot_error(u, uh, prefix):
@@ -438,11 +488,11 @@ def test_ChaillouSuri(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee = result[0], result[1], result[2]
+    glob, loc, ee, eta = result[0:4]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, label)
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -474,11 +524,11 @@ def test_CarstensenKlose(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee = result[0], result[1], result[2]
+    glob, loc, ee, eta = result[0:4]
 
     # Report
-    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, label)
+    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -522,16 +572,17 @@ def test_NicaiseVenel(sigma_minus, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u, S=S)
-    glob, loc, ee = result[0], result[1], result[2]
+    glob, loc, ee, eta = result[0:4]
 
     # Take square root of P1 functions (then they are no more polynomials...)
     function_ipow(glob, 1.0/p)
     function_ipow(loc, 1.0/p)
     function_ipow(ee, 1.0/p)
+    function_ipow(eta, 1.0/p)
 
     # Report
-    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, label)
+    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
