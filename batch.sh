@@ -16,3 +16,4 @@ python main.py NicaiseVenel -0.99 32 | tee NicaiseVenel_-0.99_32.log
 grep ^RESULT *.log          > out.txt
 grep -m 1 Estimators *.log >> out.txt
 grep "nabla r" *.log       >> out.txt
+grep "nabla(u-u_h)" *.log  >> out.txt
