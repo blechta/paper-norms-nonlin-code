@@ -586,6 +586,125 @@ def test_NicaiseVenel(sigma_minus, N):
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
+def test_BonnetBenDhia(sigma_minus, N):
+    p = 2
+    label = 'BonnetBenDhia_%s_%02d' % (sigma_minus, N)
+
+    # Fetch exact solution and rhs of p-Laplacian
+    assert N % 2 == 0
+    mesh = UnitSquareMesh(N, N, 'crossed')
+    mesh.coordinates()[:] *= 2
+    mesh.coordinates()[:] += (-1, -1)
+
+    # FIXME: Use new martinal's functionality: cell functions in cpp exprs
+    sigma = Expression("x[0] >= 0 && x[1] >= 0 ? 1.0 : sigma_minus",
+                       sigma_minus=sigma_minus, degree=0, domain=mesh)
+
+    class SolTest(Expression):
+        def __init__(self, mu, *args, **kwargs):
+            self.mu = mu
+            self.dec_point = False
+
+        def eval(self, values, x):
+            x, y = x[0:2]
+
+            x_dc = x
+            y_dc = y
+            if self.dec_point:
+                x_dc = x_dec
+                y_dc = y_dec
+
+            lmbd = 2 / pi * acos(( 1 - self.mu ) / 2.0 / abs( 1 + self.mu ))
+
+            r = sqrt( pow (x, 2) + pow (y, 2) )
+            th = self.f_angle_point_dec( x, y, x_dc, y_dc )
+            th_dc = self.f_angle_point( x_dc, y_dc )
+
+            A = sin ( lmbd * pi / 2.0 )
+            B = cos ( lmbd * pi / 2.0 )
+            D = sin ( lmbd * pi * 3 / 2.0 )
+            F = cos ( lmbd * pi * 3 / 2.0 )
+
+            c1 = 1
+            d2 = A / D
+            d1 = ( A * B + self.mu * F * A * A / D ) / ( D + self.mu * A )
+            c2 = d1 *D / A
+
+            if th_dc >= 0 and th_dc <= pi / 2.0:
+                values[0] = c1 * sin( lmbd * th ) + c2 * sin( lmbd * ( pi / 2.0 - th ))
+                values[0] *= pow( r, lmbd )
+            else:
+                values[0] = d1 * sin( lmbd * ( th - pi / 2.0 )) + d2 * sin( lmbd * ( 2 * pi - th ))
+                values[0] *= pow( r, lmbd )
+
+        @staticmethod
+        def f_angle_point(x, y):
+            ZERO2 = DOLFIN_EPS
+            if abs( x ) < ZERO2:
+                if y >= 0:
+                   theta = pi / 2.0
+                else:
+                   theta = 3 * pi / 2.0
+                return theta
+            if x >= 0 and y >= 0:
+                  theta = atan ( y / x )
+            if x < 0 and y >= 0:
+                  theta = atan ( y / x ) + pi
+            if x < 0 and y < 0:
+                  theta = atan ( y / x ) + pi
+            if x >= 0 and y < 0:
+                  theta = atan ( y / x ) + 2 * pi
+            return theta
+
+        @staticmethod
+        def f_angle_point_dec(x, y, x_dec, y_dec):
+            ZERO2 = DOLFIN_EPS
+            if abs( x ) < ZERO2:
+                if y_dec >= 0:
+                   theta = pi / 2.0
+                else:
+                   theta = 3 * pi / 2.0
+                return theta
+            if x_dec >= 0 and y_dec >= 0:
+                  theta = atan ( y / x )
+            if x_dec < 0 and y_dec >= 0:
+                  theta = atan ( y / x ) + pi
+            if x_dec < 0 and y_dec < 0:
+                  theta = atan ( y / x ) + pi
+            if x_dec >= 0 and y_dec < 0:
+                  theta = atan ( y / x ) + 2 * pi
+            return theta
+
+
+    def S(u, eps):
+        return sigma*grad(u)
+    u = SolTest(sigma_minus, degree=3, domain=mesh)
+    f = Constant(0)
+
+    #pyplot.show()
+    #plot(u, mesh=mesh, mode="warp")
+    #pyplot.show()
+    #exit()
+
+    print("num cells %s" % mesh.num_cells())
+    plot_cutoff_distribution(p, mesh, label)
+
+    # Now the heavy lifting
+    result = compute_liftings(label, p, mesh, f, u, S=S)
+    glob, loc, ee, eta = result[0:4]
+
+    # Take square root of P1 functions (then they are no more polynomials...)
+    function_ipow(glob, 1.0/p)
+    function_ipow(loc, 1.0/p)
+    function_ipow(ee, 1.0/p)
+    function_ipow(eta, 1.0/p)
+
+    # Report
+    format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, eta, label)
+    list_timings(TimingClear_clear, [TimingType_wall])
+
+
 def main(argv):
     default_tests = [
             ('ChaillouSuri',   10.0,  5),
