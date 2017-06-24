@@ -28,3 +28,4 @@ grep ^RESULT *.log          > out.txt
 grep -m 1 Estimators *.log >> out.txt
 grep "nabla r" *.log       >> out.txt
 grep "nabla(u-u_h)" *.log  >> out.txt
+grep "eta_tot" *.log       >> out.txt

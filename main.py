@@ -52,7 +52,7 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
         \sum_a ||\nabla r     ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla r^a   ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p \psi_a/|\omega_a|,
-        \sum_a \sum_{K\in\omega_a} \eta_K |K|/|\omega_a| \psi_a,
+        \sum_a \sum_{K\in\omega_a} \eta_K^q |K|/|\omega_a| \psi_a,
         C_{cont,PF},
         ||\nabla r||_p^{p-1},
         ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
@@ -147,7 +147,12 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
     # Get P1 distribution of cell estimator
+    for c in cells(est_tot.mesh()):
+        est_tot[c] **= q
+        est_tot[c] /= c.volume()
     eta = distribute_cellfunction_to_p1(est_tot, Function(V))
+    est_tot.set_all(0)
+    info_blue("eta_tot = %g" % assemble(eta*dx)**(1.0/q))
 
     return dr_glob_p1, r_loc_p1, ee_p1, eta, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
 
@@ -301,11 +306,12 @@ def compute_cellwise_grad(r, p, mesh_fine=None):
 
 
 def distribute_p0_to_p1(f, out=None):
-    r"""Distribute P0 function to P1 function s.t.
+    r"""Distribute P0 function f to P1 function g s.t.
 
-        g = \sum_{a \in vertices} \sum_{K \ni a} f_K |K|/|\omega_a|
+        g = \sum_{a \in vertices} \sum_{K \ni a} f_K |K|/|\omega_a| \psi_a
 
-    Returns P1 function g.
+    where \psi_a is P1 basis function for vertex a and \omega_a
+    is a patch of cells around vertex a. Returns P1 function g.
     """
     P0 = f.function_space()
     mesh = P0.mesh()
@@ -342,11 +348,12 @@ def distribute_p0_to_p1(f, out=None):
 
 
 def distribute_cellfunction_to_p1(f, out=None):
-    r"""Distribute cell function to P1 function s.t.
+    r"""Distribute cell function f to P1 function g s.t.
 
-        g = \sum_{a \in vertices} \sum_{K \ni a} f_K |K|/|\omega_a|
+        g = \sum_{a \in vertices} \sum_{K \ni a} f_K |K|/|\omega_a| \psi_a
 
-    Returns P1 function g.
+    where \psi_a is P1 basis function for vertex a and \omega_a
+    is a patch of cells around vertex a. Returns P1 function g.
     """
     mesh = f.mesh()
     if out is None:
@@ -537,7 +544,7 @@ def test_CarstensenKlose(p, N):
 
 
 def test_NicaiseVenel(sigma_minus, N):
-    p = 2
+    p = q = 2
     label = 'NicaiseVenel_%s_%02d' % (sigma_minus, N)
 
     # Fetch exact solution and rhs of p-Laplacian
@@ -579,10 +586,10 @@ def test_NicaiseVenel(sigma_minus, N):
     glob, loc, ee, eta = result[0:4]
 
     # Take square root of P1 functions (then they are no more polynomials...)
-    function_ipow(glob, 1.0/p)
-    function_ipow(loc, 1.0/p)
+    function_ipow(glob, 1.0/q)
+    function_ipow(loc, 1.0/q)
     function_ipow(ee, 1.0/p)
-    function_ipow(eta, 1.0/p)
+    function_ipow(eta, 1.0/q)
 
     # Report
     format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[4:])
@@ -591,7 +598,7 @@ def test_NicaiseVenel(sigma_minus, N):
 
 
 def test_BonnetBenDhia(sigma_minus, N):
-    p = 2
+    p = q = 2
     label = 'BonnetBenDhia_%s_%02d' % (sigma_minus, N)
 
     # Fetch exact solution and rhs of p-Laplacian
@@ -698,10 +705,10 @@ def test_BonnetBenDhia(sigma_minus, N):
     glob, loc, ee, eta = result[0:4]
 
     # Take square root of P1 functions (then they are no more polynomials...)
-    function_ipow(glob, 1.0/p)
-    function_ipow(loc, 1.0/p)
+    function_ipow(glob, 1.0/q)
+    function_ipow(loc, 1.0/q)
     function_ipow(ee, 1.0/p)
-    function_ipow(eta, 1.0/p)
+    function_ipow(eta, 1.0/q)
 
     # Report
     format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), *result[4:])
