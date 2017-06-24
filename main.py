@@ -33,6 +33,7 @@ from dolfintape.poincare import poincare_friedrichs_cutoff
 from dolfintape.plotting import plot_alongside, pyplot
 from dolfintape.utils import mkdir_p, list_timings
 from dolfintape.demo_problems import solve_p_laplace_adaptive
+from dolfintape.demo_problems import pLaplaceAdaptiveSolver
 from dolfintape.sobolev_norm import sobolev_norm
 
 
@@ -45,7 +46,7 @@ parameters['form_compiler']['representation'] = 'quadrature'
 parameters['form_compiler']['optimize'] = True
 
 
-def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
+def compute_liftings(name, p, u, f, exact_solution=None, S=None):
     r"""Find approximation to p-Laplace problem with rhs f,
     and compute global and local liftings of the residual.
     Return tuple (
@@ -53,13 +54,18 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
         \sum_a ||\nabla r^a   ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a \sum_{K\in\omega_a} \eta_K^q |K|/|\omega_a| \psi_a,
+        \sum_K \eta_K 1_K,
         C_{cont,PF},
         ||\nabla r||_p^{p-1},
         ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
         Eff_{(4.8a)},
         Eff_{(4.8b)}
-    ). First three are P1 functions, the rest are numbers.
+    ). First four are P1 functions, the fifth is a cell function,
+    and the rest are numbers.
     """
+    V = u.function_space()
+    mesh = V.mesh()
+
     q = p/(p-1) # Dual Lebesgue exponent
     N = mesh.topology().dim() + 1 # Vertices per cell
 
@@ -68,9 +74,8 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
 
     # Get Galerkin approximation of p-Laplace problem -\Delta_p u = f
     log(25, 'Computing residual of p-Laplace problem')
-    V = FunctionSpace(mesh, 'Lagrange', 1)
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: Est_eps <= 1e-6*Est_tot
-    u, est_h, est_eps, est_tot = solve_p_laplace_adaptive(p, criterion, V, f, S,
+    u, est_h, est_eps, est_tot = solve_p_laplace_adaptive(p, criterion, u, f, S,
                                                           u_ex=exact_solution, eps0=0.0)
 
     # Plot exact solution, approximation and error
@@ -147,14 +152,14 @@ def compute_liftings(name, p, mesh, f, exact_solution=None, S=None):
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
     # Get P1 distribution of cell estimator
+    est_tot_scaled = CellFunction('double', est_tot.mesh())
     for c in cells(est_tot.mesh()):
-        est_tot[c] **= q
-        est_tot[c] /= c.volume()
-    eta = distribute_cellfunction_to_p1(est_tot, Function(V))
-    est_tot.set_all(0)
+        est_tot_scaled[c] = est_tot[c]**q / c.volume()
+    eta = distribute_cellfunction_to_p1(est_tot_scaled, Function(V))
     info_blue("eta_tot = %g" % assemble(eta*dx)**(1.0/q))
 
-    return dr_glob_p1, r_loc_p1, ee_p1, eta, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
+    return dr_glob_p1, r_loc_p1, ee_p1, eta, est_tot, \
+        C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -167,10 +172,12 @@ def compute_global_lifting(p, mesh, f, S):
     V_high = FunctionSpace(mesh, 'Lagrange', 2)
     parameters['form_compiler']['quadrature_degree'] = 8
 
+
     # Compute lifting adaptively
     criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: \
         Est_eps <= 1e-2*Est_tot and Est_tot <= 1e-2*sobolev_norm(u_h, p)**(p-1.0)
-    r_glob, _, _, _ = solve_p_laplace_adaptive(p, criterion, V_high, f, S,
+    r_glob = Function(V_high)
+    r_glob, _, _, _ = solve_p_laplace_adaptive(p, criterion, r_glob, f, S,
             solver_parameters={"newton_solver": {"linear_solver": "mumps"}})
 
     # Rollback side-effect
@@ -215,7 +222,8 @@ def compute_local_liftings(p, P1, f, S):
         criterion = lambda u_h, Est_h, Est_eps, Est_tot, Est_up: \
             Est_eps <= 1e-2*Est_tot and Est_tot <= 1e-2*sobolev_norm(u_h, p)**(p-1.0)
         parameters['form_compiler']['quadrature_degree'] = 8
-        r, _, _, _ = solve_p_laplace_adaptive(p, criterion, V_loc, f, S)
+        r = Function(V_loc)
+        r, _, _, _ = solve_p_laplace_adaptive(p, criterion, r, f, S)
         parameters['form_compiler']['quadrature_degree'] = -1
 
         # Compute local norm of residual
@@ -495,14 +503,16 @@ def test_ChaillouSuri(p, N):
     mesh = UnitSquareMesh(N, N, 'crossed')
     print("num cells %s" % mesh.num_cells())
     plot_cutoff_distribution(p, mesh, label)
-    u, f = pLaplace_ChaillouSuri(p, domain=mesh, degree=4)
+    u_ex, f = pLaplace_ChaillouSuri(p, domain=mesh, degree=4)
 
     # Now the heavy lifting
-    result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee, eta = result[0:4]
+    V = FunctionSpace(mesh, "P", 1)
+    u = Function(V)
+    result = compute_liftings(label, p, u, f, u_ex)
+    glob, loc, ee, eta, est_tot = result[0:5]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[4:])
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
@@ -523,8 +533,8 @@ def test_CarstensenKlose(p, N):
     plot_cutoff_distribution(p, mesh, label)
 
     # Fetch exact solution and rhs of p-Laplacian
-    u, f = pLaplace_CarstensenKlose(p=p, eps=0.0, delta=7.0/8,
-                                    domain=mesh, degree=4)
+    u_ex, f = pLaplace_CarstensenKlose(p=p, eps=0.0, delta=7.0/8,
+                                       domain=mesh, degree=4)
     # There are some problems with quadrature element,
     # see https://bitbucket.org/fenics-project/ffc/issues/84,
     # so precompute (f, vh) for vh from P1
@@ -534,11 +544,13 @@ def test_CarstensenKlose(p, N):
     f.set_allow_extrapolation(True)
 
     # Now the heavy lifting
-    result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee, eta = result[0:4]
+    V = FunctionSpace(mesh, "P", 1)
+    u = Function(V)
+    result = compute_liftings(label, p, u, f, u_ex)
+    glob, loc, ee, eta, est_tot = result[0:5]
 
     # Report
-    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[4:])
+    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
@@ -547,7 +559,6 @@ def test_NicaiseVenel(sigma_minus, N):
     p = q = 2
     label = 'NicaiseVenel_%s_%02d' % (sigma_minus, N)
 
-    # Fetch exact solution and rhs of p-Laplacian
     assert N % 2 == 0
     mesh = UnitSquareMesh(N, N, 'crossed')
     mesh.coordinates()[:] *= 2
@@ -561,29 +572,22 @@ def test_NicaiseVenel(sigma_minus, N):
                        sigma_minus=sigma_minus, degree=0, domain=mesh)
     def S(u, eps):
         return sigma*grad(u)
-    u = Expression("x[0] > 0.0 ? "
-                   "sigma_minus*x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)"
-                   " : "
-                   "x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)",
-                   sigma_minus=sigma_minus, degree=5, domain=mesh)
+    u_ex = Expression("x[0] > 0.0 ? "
+                      "sigma_minus*x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)"
+                      " : "
+                      "x[0]*(x[0]+1)*(x[0]-1)*(x[1]+1)*(x[1]-1)",
+                      sigma_minus=sigma_minus, degree=5, domain=mesh)
     f = Expression("-sigma_minus*2.0*x[0]*((x[0]+1)*(x[0]-1)+3.0*(x[1]+1)*(x[1]-1))",
                    sigma_minus=sigma_minus, degree=3, domain=mesh)
-
-    #pyplot.figure()
-    #plot(cf)
-    #pyplot.show()
-    #plot(u, mesh=mesh, mode="warp")
-    #pyplot.show()
-    #plot(f, mesh=mesh, mode="warp")
-    #pyplot.show()
-    #exit()
 
     print("num cells %s" % mesh.num_cells())
     plot_cutoff_distribution(p, mesh, label)
 
     # Now the heavy lifting
-    result = compute_liftings(label, p, mesh, f, u, S=S)
-    glob, loc, ee, eta = result[0:4]
+    V = FunctionSpace(mesh, "P", 1)
+    u = Function(V)
+    result = compute_liftings(label, p, u, f, u_ex, S=S)
+    glob, loc, ee, eta, est_tot = result[0:5]
 
     # Take square root of P1 functions (then they are no more polynomials...)
     function_ipow(glob, 1.0/q)
@@ -592,16 +596,91 @@ def test_NicaiseVenel(sigma_minus, N):
     function_ipow(eta, 1.0/q)
 
     # Report
-    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[4:])
+    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
+
+
+class BonnetBenDhiaSolution(Expression):
+    def __init__(self, mu, *args, **kwargs):
+        self.mu = mu
+        self.dec_point = False
+
+    def eval(self, values, x):
+        x, y = x[0:2]
+
+        x_dc = x
+        y_dc = y
+        if self.dec_point:
+            x_dc = x_dec
+            y_dc = y_dec
+
+        lmbd = 2 / pi * acos(( 1 - self.mu ) / 2.0 / abs( 1 + self.mu ))
+
+        r = sqrt( pow (x, 2) + pow (y, 2) )
+        th = self.f_angle_point_dec( x, y, x_dc, y_dc )
+        th_dc = self.f_angle_point( x_dc, y_dc )
+
+        A = sin ( lmbd * pi / 2.0 )
+        B = cos ( lmbd * pi / 2.0 )
+        D = sin ( lmbd * pi * 3 / 2.0 )
+        F = cos ( lmbd * pi * 3 / 2.0 )
+
+        c1 = 1
+        d2 = A / D
+        d1 = ( A * B + self.mu * F * A * A / D ) / ( D + self.mu * A )
+        c2 = d1 *D / A
+
+        if th_dc >= 0 and th_dc <= pi / 2.0:
+            values[0] = c1 * sin( lmbd * th ) + c2 * sin( lmbd * ( pi / 2.0 - th ))
+            values[0] *= pow( r, lmbd )
+        else:
+            values[0] = d1 * sin( lmbd * ( th - pi / 2.0 )) + d2 * sin( lmbd * ( 2 * pi - th ))
+            values[0] *= pow( r, lmbd )
+
+    @staticmethod
+    def f_angle_point(x, y):
+        ZERO2 = DOLFIN_EPS
+        if abs( x ) < ZERO2:
+            if y >= 0:
+               theta = pi / 2.0
+            else:
+               theta = 3 * pi / 2.0
+            return theta
+        if x >= 0 and y >= 0:
+              theta = atan ( y / x )
+        if x < 0 and y >= 0:
+              theta = atan ( y / x ) + pi
+        if x < 0 and y < 0:
+              theta = atan ( y / x ) + pi
+        if x >= 0 and y < 0:
+              theta = atan ( y / x ) + 2 * pi
+        return theta
+
+    @staticmethod
+    def f_angle_point_dec(x, y, x_dec, y_dec):
+        ZERO2 = DOLFIN_EPS
+        if abs( x ) < ZERO2:
+            if y_dec >= 0:
+               theta = pi / 2.0
+            else:
+               theta = 3 * pi / 2.0
+            return theta
+        if x_dec >= 0 and y_dec >= 0:
+              theta = atan ( y / x )
+        if x_dec < 0 and y_dec >= 0:
+              theta = atan ( y / x ) + pi
+        if x_dec < 0 and y_dec < 0:
+              theta = atan ( y / x ) + pi
+        if x_dec >= 0 and y_dec < 0:
+              theta = atan ( y / x ) + 2 * pi
+        return theta
 
 
 def test_BonnetBenDhia(sigma_minus, N):
     p = q = 2
     label = 'BonnetBenDhia_%s_%02d' % (sigma_minus, N)
 
-    # Fetch exact solution and rhs of p-Laplacian
     assert N % 2 == 0
     mesh = UnitSquareMesh(N, N, 'crossed')
     mesh.coordinates()[:] *= 2
@@ -610,99 +689,19 @@ def test_BonnetBenDhia(sigma_minus, N):
     # FIXME: Use new martinal's functionality: cell functions in cpp exprs
     sigma = Expression("x[0] >= 0 && x[1] >= 0 ? 1.0 : sigma_minus",
                        sigma_minus=sigma_minus, degree=0, domain=mesh)
-
-    class SolTest(Expression):
-        def __init__(self, mu, *args, **kwargs):
-            self.mu = mu
-            self.dec_point = False
-
-        def eval(self, values, x):
-            x, y = x[0:2]
-
-            x_dc = x
-            y_dc = y
-            if self.dec_point:
-                x_dc = x_dec
-                y_dc = y_dec
-
-            lmbd = 2 / pi * acos(( 1 - self.mu ) / 2.0 / abs( 1 + self.mu ))
-
-            r = sqrt( pow (x, 2) + pow (y, 2) )
-            th = self.f_angle_point_dec( x, y, x_dc, y_dc )
-            th_dc = self.f_angle_point( x_dc, y_dc )
-
-            A = sin ( lmbd * pi / 2.0 )
-            B = cos ( lmbd * pi / 2.0 )
-            D = sin ( lmbd * pi * 3 / 2.0 )
-            F = cos ( lmbd * pi * 3 / 2.0 )
-
-            c1 = 1
-            d2 = A / D
-            d1 = ( A * B + self.mu * F * A * A / D ) / ( D + self.mu * A )
-            c2 = d1 *D / A
-
-            if th_dc >= 0 and th_dc <= pi / 2.0:
-                values[0] = c1 * sin( lmbd * th ) + c2 * sin( lmbd * ( pi / 2.0 - th ))
-                values[0] *= pow( r, lmbd )
-            else:
-                values[0] = d1 * sin( lmbd * ( th - pi / 2.0 )) + d2 * sin( lmbd * ( 2 * pi - th ))
-                values[0] *= pow( r, lmbd )
-
-        @staticmethod
-        def f_angle_point(x, y):
-            ZERO2 = DOLFIN_EPS
-            if abs( x ) < ZERO2:
-                if y >= 0:
-                   theta = pi / 2.0
-                else:
-                   theta = 3 * pi / 2.0
-                return theta
-            if x >= 0 and y >= 0:
-                  theta = atan ( y / x )
-            if x < 0 and y >= 0:
-                  theta = atan ( y / x ) + pi
-            if x < 0 and y < 0:
-                  theta = atan ( y / x ) + pi
-            if x >= 0 and y < 0:
-                  theta = atan ( y / x ) + 2 * pi
-            return theta
-
-        @staticmethod
-        def f_angle_point_dec(x, y, x_dec, y_dec):
-            ZERO2 = DOLFIN_EPS
-            if abs( x ) < ZERO2:
-                if y_dec >= 0:
-                   theta = pi / 2.0
-                else:
-                   theta = 3 * pi / 2.0
-                return theta
-            if x_dec >= 0 and y_dec >= 0:
-                  theta = atan ( y / x )
-            if x_dec < 0 and y_dec >= 0:
-                  theta = atan ( y / x ) + pi
-            if x_dec < 0 and y_dec < 0:
-                  theta = atan ( y / x ) + pi
-            if x_dec >= 0 and y_dec < 0:
-                  theta = atan ( y / x ) + 2 * pi
-            return theta
-
-
     def S(u, eps):
         return sigma*grad(u)
-    u = SolTest(sigma_minus, degree=3, domain=mesh)
+    u_ex = BonnetBenDhiaSolution(sigma_minus, degree=3, domain=mesh)
     f = Constant(0)
-
-    #pyplot.show()
-    #plot(u, mesh=mesh, mode="warp")
-    #pyplot.show()
-    #exit()
 
     print("num cells %s" % mesh.num_cells())
     plot_cutoff_distribution(p, mesh, label)
 
     # Now the heavy lifting
-    result = compute_liftings(label, p, mesh, f, u, S=S)
-    glob, loc, ee, eta = result[0:4]
+    V = FunctionSpace(mesh, "P", 1)
+    u = Function(V)
+    result = compute_liftings(label, p, u, f, u_ex, S=S)
+    glob, loc, ee, eta, est_tot = result[0:5]
 
     # Take square root of P1 functions (then they are no more polynomials...)
     function_ipow(glob, 1.0/q)
@@ -711,9 +710,73 @@ def test_BonnetBenDhia(sigma_minus, N):
     function_ipow(eta, 1.0/q)
 
     # Report
-    format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), *result[4:])
+    format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, eta, label)
     list_timings(TimingClear_clear, [TimingType_wall])
+
+
+def test_BonnetBenDhia_adaptive(sigma_minus, N):
+    p = q = 2
+
+    assert N % 2 == 0
+    mesh = UnitSquareMesh(N, N, 'crossed')
+    mesh.coordinates()[:] *= 2
+    mesh.coordinates()[:] += (-1, -1)
+    V = FunctionSpace(mesh, "P", 1)
+    u = Function(V)
+
+    errors = []
+    tolerance = 0.125
+
+    while True:
+        label = 'BonnetBenDhia_adaptive_%s_%02d' % (sigma_minus, mesh.num_cells())
+
+        # FIXME: Use new martinal's functionality: cell functions in cpp exprs
+        sigma = Expression("x[0] >= 0 && x[1] >= 0 ? 1.0 : sigma_minus",
+                           sigma_minus=sigma_minus, degree=0, domain=mesh)
+        def S(u, eps):
+            return sigma*grad(u)
+        u_ex = BonnetBenDhiaSolution(sigma_minus, degree=3, domain=mesh)
+        f = Constant(0)
+
+        print("num cells %s" % mesh.num_cells())
+        print("num vertices %s" % mesh.num_vertices())
+        plot_cutoff_distribution(p, mesh, label)
+
+        # Now the heavy lifting
+        result = compute_liftings(label, p, u, f, u_ex, S=S)
+        glob, loc, ee, eta, est_tot = result[0:5]
+
+        # Take square root of P1 functions (then they are no more polynomials...)
+        function_ipow(glob, 1.0/q)
+        function_ipow(loc, 1.0/q)
+        function_ipow(ee, 1.0/p)
+        function_ipow(eta, 1.0/q)
+
+        # Report
+        format_result('Bonnet--BenDhia_adaptive', sigma_minus, mesh.num_cells(), *result[5:])
+        plot_liftings(glob, loc, ee, eta, label)
+        list_timings(TimingClear_clear, [TimingType_wall])
+
+        # Check error
+        errors.append(result[6])
+        if errors[-1] / errors[0] < tolerance:
+            break
+
+        # Refine mesh
+        markers = pLaplaceAdaptiveSolver.estimator_to_markers(est_tot, q, fraction=0.875)
+        log(25, 'Marked %s of %s cells for refinement'
+                % (sum(markers), markers.mesh().num_cells()))
+        adapt(V.mesh(), markers)
+        mesh = V.mesh().child()
+        adapt(u, mesh)
+        u = u.child()
+        V = u.function_space()
+
+        # Drop coarse data
+        mesh.set_parent(None)
+        u.set_parent(None)
+        V.set_parent(None)
 
 
 def main(argv):

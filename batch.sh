@@ -24,6 +24,15 @@ python main.py BonnetBenDhia -5 032 | tee BonnetBenDhia_-5_032.log
 python main.py BonnetBenDhia -5 064 | tee BonnetBenDhia_-5_064.log
 python main.py BonnetBenDhia -5 128 | tee BonnetBenDhia_-5_128.log
 
+python main.py BonnetBenDhia -3.1 008 | tee BonnetBenDhia_-3.1_008.log
+python main.py BonnetBenDhia -3.1 016 | tee BonnetBenDhia_-3.1_016.log
+python main.py BonnetBenDhia -3.1 032 | tee BonnetBenDhia_-3.1_032.log
+python main.py BonnetBenDhia -3.1 064 | tee BonnetBenDhia_-3.1_064.log
+python main.py BonnetBenDhia -3.1 128 | tee BonnetBenDhia_-3.1_128.log
+
+python main.py BonnetBenDhia_adaptive -5   008 | tee BonnetBenDhia_adaptive_-5_008.log
+python main.py BonnetBenDhia_adaptive -3.1 008 | tee BonnetBenDhia_adaptive_-3.1_008.log
+
 grep ^RESULT *.log          > out.txt
 grep -m 1 Estimators *.log >> out.txt
 grep "nabla r" *.log       >> out.txt
