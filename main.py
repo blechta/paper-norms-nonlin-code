@@ -59,7 +59,9 @@ def compute_liftings(name, p, u, f, exact_solution=None, S=None):
         ||\nabla r||_p^{p-1},
         ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
         Eff_{(4.8a)},
-        Eff_{(4.8b)}
+        Eff_{(4.8b)},
+        \eta,
+        ||\nabla(u-u_h)||_p,
     ). First four are P1 functions, the fifth is a cell function,
     and the rest are numbers.
     """
@@ -151,15 +153,20 @@ def compute_liftings(name, p, u, f, exact_solution=None, S=None):
     info_green("(4.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
 
-    # Get P1 distribution of cell estimator
+    # Get P1 distribution of cell estimator, and the estimate of total error
     est_tot_scaled = CellFunction('double', est_tot.mesh())
+    eta_ = 0.0
     for c in cells(est_tot.mesh()):
+        eta_ += est_tot[c]**q
         est_tot_scaled[c] = est_tot[c]**q / c.volume()
-    eta = distribute_cellfunction_to_p1(est_tot_scaled, Function(V))
-    info_blue("eta_tot = %g" % assemble(eta*dx)**(1.0/q))
+    eta_ **= 1.0/q
+    est_tot_p1 = distribute_cellfunction_to_p1(est_tot_scaled, Function(V))
+    eta = assemble(est_tot_p1*dx)**(1.0/q)
+    assert np.isclose(eta_, eta)
+    info_blue("eta = %g" % eta)
 
-    return dr_glob_p1, r_loc_p1, ee_p1, eta, est_tot, \
-        C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
+    return dr_glob_p1, r_loc_p1, ee_p1, est_tot_p1, est_tot, \
+        C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b, eta, ee
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -416,22 +423,22 @@ def plot_liftings(glob, loc, ee, eta, prefix):
     # Plot global lifting and energy error norms on patches
     plot_alongside(glob, ee, common_cbar=False, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_ee_f.pdf"))
-    plot_alongside(glob, ee, common_cbar=False, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_ee_g.pdf"))
+    #plot_alongside(glob, ee, common_cbar=False, mode="color", shading="gouraud")
+    #pyplot.savefig(os.path.join(path, prefix+"_ee_g.pdf"))
     plot_alongside(glob, ee, common_cbar=False, mode="warp", range_min=0.0)
     pyplot.savefig(os.path.join(path, prefix+"_ee_w.pdf"))
-    plot_alongside(glob, ee, common_cbar=False, mode="contour")
-    pyplot.savefig(os.path.join(path, prefix+"_ee_c.pdf"))
+    #plot_alongside(glob, ee, common_cbar=False, mode="contour")
+    #pyplot.savefig(os.path.join(path, prefix+"_ee_c.pdf"))
 
     # Plot global lifting norm and error estimator on patches
     plot_alongside(glob, eta, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_eta_f.pdf"))
-    plot_alongside(glob, eta, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_eta_g.pdf"))
+    #plot_alongside(glob, eta, mode="color", shading="gouraud")
+    #pyplot.savefig(os.path.join(path, prefix+"_eta_g.pdf"))
     plot_alongside(glob, eta, mode="warp", range_min=0.0)
     pyplot.savefig(os.path.join(path, prefix+"_eta_w.pdf"))
-    plot_alongside(glob, eta, mode="contour")
-    pyplot.savefig(os.path.join(path, prefix+"_eta_c.pdf"))
+    #plot_alongside(glob, eta, mode="contour")
+    #pyplot.savefig(os.path.join(path, prefix+"_eta_c.pdf"))
 
 
 def plot_error(u, uh, prefix):
@@ -442,23 +449,23 @@ def plot_error(u, uh, prefix):
     u = project(u, uh.function_space())
     plot_alongside(u, uh, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_u_f.pdf"))
-    plot_alongside(u, uh, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_u_g.pdf"))
+    #plot_alongside(u, uh, mode="color", shading="gouraud")
+    #pyplot.savefig(os.path.join(path, prefix+"_u_g.pdf"))
     plot_alongside(u, uh, mode="warp")
     pyplot.savefig(os.path.join(path, prefix+"_u_w.pdf"))
-    plot_alongside(u, uh, mode="contour")
-    pyplot.savefig(os.path.join(path, prefix+"_u_c.pdf"))
+    #plot_alongside(u, uh, mode="contour")
+    #pyplot.savefig(os.path.join(path, prefix+"_u_c.pdf"))
 
     # Plot error
     e = project(u-uh, uh.function_space())
     plot_alongside(e, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_e_f.pdf"))
-    plot_alongside(e, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_e_g.pdf"))
+    #plot_alongside(e, mode="color", shading="gouraud")
+    #pyplot.savefig(os.path.join(path, prefix+"_e_g.pdf"))
     plot_alongside(e, mode="warp")
     pyplot.savefig(os.path.join(path, prefix+"_e_w.pdf"))
-    plot_alongside(e, mode="contour")
-    pyplot.savefig(os.path.join(path, prefix+"_e_c.pdf"))
+    #plot_alongside(e, mode="contour")
+    #pyplot.savefig(os.path.join(path, prefix+"_e_c.pdf"))
 
 
 def plot_cutoff_distribution(p, mesh, prefix):
@@ -478,20 +485,21 @@ def plot_cutoff_distribution(p, mesh, prefix):
     mkdir_p(path)
     plot_alongside(dist, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_cutoff_f.pdf"))
-    plot_alongside(dist, mode="color", shading="gouraud")
-    pyplot.savefig(os.path.join(path, prefix+"_cutoff_g.pdf"))
+    #plot_alongside(dist, mode="color", shading="gouraud")
+    #pyplot.savefig(os.path.join(path, prefix+"_cutoff_g.pdf"))
     plot_alongside(dist, mode="warp", range_min=0.0)
     pyplot.savefig(os.path.join(path, prefix+"_cutoff_w.pdf"))
 
 
 def format_result(*args):
-    assert len(args) == 9
+    assert len(args) == 13
     assert isinstance(args[0], str) and len(args[0].split()) == 1
-    assert isinstance(args[2], int)
-    assert all(isinstance(args[i], float) for i in [1]+range(3, 9))
-    print("#RESULT name, p, num_cells, C_{cont,PF}, " \
-          "||E_glob||_q, ||E_loc||_q, Eff_(4.8a), Eff_(4.8b)")
-    print("RESULT %s %s %4d %.3f %.4f %.4f %.1f %.1f %.2f" % args)
+    assert isinstance(args[1], float)
+    assert all(isinstance(arg, int) for arg in args[2:5])
+    assert all(isinstance(arg, float) for arg in args[5:])
+    print(r"#RESULT name, p, num_cells, num_vertices, num_dofs, C_{cont,PF}, " \
+          r"||E_glob||_q, ||E_loc||_q, Eff_(3.11), Eff_(5.5), Eff_(3.12), \eta, ||\nabla(u-u_h)||_p")
+    print("RESULT %s %s %5d %6d %7d %.3f %.4f %.4f %.1f %.1f %.2f %.7f %.7f" % args)
 
 
 def test_ChaillouSuri(p, N):
@@ -509,11 +517,13 @@ def test_ChaillouSuri(p, N):
     V = FunctionSpace(mesh, "P", 1)
     u = Function(V)
     result = compute_liftings(label, p, u, f, u_ex)
-    glob, loc, ee, eta, est_tot = result[0:5]
+    glob, loc, ee, est_tot_p1, est_tot = result[0:5]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[5:])
-    plot_liftings(glob, loc, ee, eta, label)
+    format_result('Chaillou--Suri', p, mesh.num_cells(), mesh.num_vertices(),
+                  V.dim(), *result[5:])
+    plot_liftings(glob, loc, ee, est_tot_p1, label)
+    pyplot.close('all')
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -547,11 +557,13 @@ def test_CarstensenKlose(p, N):
     V = FunctionSpace(mesh, "P", 1)
     u = Function(V)
     result = compute_liftings(label, p, u, f, u_ex)
-    glob, loc, ee, eta, est_tot = result[0:5]
+    glob, loc, ee, est_tot_p1, est_tot = result[0:5]
 
     # Report
-    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[5:])
-    plot_liftings(glob, loc, ee, eta, label)
+    format_result('Carstensen--Klose', p, mesh.num_cells(), mesh.num_vertices(),
+                  V.dim(), *result[5:])
+    plot_liftings(glob, loc, ee, est_tot_p1, label)
+    pyplot.close('all')
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -587,17 +599,19 @@ def test_NicaiseVenel(sigma_minus, N):
     V = FunctionSpace(mesh, "P", 1)
     u = Function(V)
     result = compute_liftings(label, p, u, f, u_ex, S=S)
-    glob, loc, ee, eta, est_tot = result[0:5]
+    glob, loc, ee, est_tot_p1, est_tot = result[0:5]
 
     # Take square root of P1 functions (then they are no more polynomials...)
     function_ipow(glob, 1.0/q)
     function_ipow(loc, 1.0/q)
     function_ipow(ee, 1.0/p)
-    function_ipow(eta, 1.0/q)
+    function_ipow(est_tot_p1, 1.0/q)
 
     # Report
-    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), *result[5:])
-    plot_liftings(glob, loc, ee, eta, label)
+    format_result('Nicaise--Venel', sigma_minus, mesh.num_cells(), mesh.num_vertices(),
+                  V.dim(), *result[5:])
+    plot_liftings(glob, loc, ee, est_tot_p1, label)
+    pyplot.close('all')
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -701,17 +715,19 @@ def test_BonnetBenDhia(sigma_minus, N):
     V = FunctionSpace(mesh, "P", 1)
     u = Function(V)
     result = compute_liftings(label, p, u, f, u_ex, S=S)
-    glob, loc, ee, eta, est_tot = result[0:5]
+    glob, loc, ee, est_tot_p1, est_tot = result[0:5]
 
     # Take square root of P1 functions (then they are no more polynomials...)
     function_ipow(glob, 1.0/q)
     function_ipow(loc, 1.0/q)
     function_ipow(ee, 1.0/p)
-    function_ipow(eta, 1.0/q)
+    function_ipow(est_tot_p1, 1.0/q)
 
     # Report
-    format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), *result[5:])
-    plot_liftings(glob, loc, ee, eta, label)
+    format_result('Bonnet--BenDhia', sigma_minus, mesh.num_cells(), mesh.num_vertices(),
+                  V.dim(), *result[5:])
+    plot_liftings(glob, loc, ee, est_tot_p1, label)
+    pyplot.close('all')
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -745,17 +761,19 @@ def test_BonnetBenDhia_adaptive(sigma_minus, N):
 
         # Now the heavy lifting
         result = compute_liftings(label, p, u, f, u_ex, S=S)
-        glob, loc, ee, eta, est_tot = result[0:5]
+        glob, loc, ee, est_tot_p1, est_tot = result[0:5]
 
         # Take square root of P1 functions (then they are no more polynomials...)
         function_ipow(glob, 1.0/q)
         function_ipow(loc, 1.0/q)
         function_ipow(ee, 1.0/p)
-        function_ipow(eta, 1.0/q)
+        function_ipow(est_tot_p1, 1.0/q)
 
         # Report
-        format_result('Bonnet--BenDhia_adaptive', sigma_minus, mesh.num_cells(), *result[5:])
-        plot_liftings(glob, loc, ee, eta, label)
+        format_result('Bonnet--BenDhia_adaptive', sigma_minus, mesh.num_cells(), mesh.num_vertices(),
+                      V.dim(), *result[5:])
+        plot_liftings(glob, loc, ee, est_tot_p1, label)
+        pyplot.close('all')
         list_timings(TimingClear_clear, [TimingType_wall])
 
         # Check error
@@ -764,7 +782,7 @@ def test_BonnetBenDhia_adaptive(sigma_minus, N):
             break
 
         # Refine mesh
-        markers = pLaplaceAdaptiveSolver.estimator_to_markers(est_tot, q, fraction=0.875)
+        markers = pLaplaceAdaptiveSolver.estimator_to_markers(est_tot, q, fraction=0.5)
         log(25, 'Marked %s of %s cells for refinement'
                 % (sum(markers), markers.mesh().num_cells()))
         adapt(V.mesh(), markers)

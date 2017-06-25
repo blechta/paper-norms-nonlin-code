@@ -33,8 +33,5 @@ python main.py BonnetBenDhia -3.1 128 | tee BonnetBenDhia_-3.1_128.log
 python main.py BonnetBenDhia_adaptive -5   008 | tee BonnetBenDhia_adaptive_-5_008.log
 python main.py BonnetBenDhia_adaptive -3.1 008 | tee BonnetBenDhia_adaptive_-3.1_008.log
 
-grep ^RESULT *.log          > out.txt
-grep -m 1 Estimators *.log >> out.txt
-grep "nabla r" *.log       >> out.txt
-grep "nabla(u-u_h)" *.log  >> out.txt
-grep "eta_tot" *.log       >> out.txt
+
+grep -h ^RESULT *.log > out.txt
