@@ -35,3 +35,14 @@ python main.py BonnetBenDhia_adaptive -3.1 008 | tee BonnetBenDhia_adaptive_-3.1
 
 
 grep -h ^RESULT *.log > out.txt
+
+gnuplot <<EOF
+set log xy
+set term pdf
+set out "out.pdf"
+p "<(grep 'Bonnet--BenDhia_adaptive -5.0' out.txt)" u 6:8 w lp, "<(grep 'Bonnet--BenDhia -5.0' out.txt)" u 6:8 w lp, 5*x**-0.5
+p "<(grep 'Bonnet--BenDhia_adaptive -3.1' out.txt)" u 6:8 w lp, "<(grep 'Bonnet--BenDhia -3.1' out.txt)" u 6:8 w lp, 5*x**-0.5
+p "<(grep 'Nicaise--Venel -0.01' out.txt)" u 6:8 w lp, 5*x**-0.5
+p "<(grep 'Nicaise--Venel -0.33' out.txt)" u 6:8 w lp, 5*x**-0.5
+p "<(grep 'Nicaise--Venel -0.99' out.txt)" u 6:8 w lp, 5*x**-0.5
+EOF
