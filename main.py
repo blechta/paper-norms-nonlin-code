@@ -26,6 +26,7 @@ its residual in W^{-1,q} to demonstrate localization result of
 from __future__ import print_function
 
 from dolfin import *
+import ufl
 import numpy as np
 import os
 
@@ -77,6 +78,28 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     # p-Laplacian flux of u
     S = inner(grad(u), grad(u))**(0.5*Constant(p)-1.0) * grad(u)
 
+    # Compute cell-wise norm of flux
+    if exact_solution is not None:
+        u_ex = exact_solution
+    else:
+        warning("Don't have exact solution for computation of flux error. Assuming zero.")
+        u_ex = Constant(0)
+    S_ex = ufl.replace(S, {u: u_ex})
+    S_ex = inner(grad(exact_solution), grad(exact_solution))**(0.5*Constant(p)-1.0) * grad(exact_solution)
+    mesh_fine = u.function_space().mesh()
+    flux_err = ((S - S_ex)**2)**Constant(0.5*q)
+    flux_err_fine, flux_err_coarse = compute_cellwise_norm(flux_err, mesh_fine)
+
+    # Distribute cell-wise flux error to patches
+    flux_err_p1 = distribute_p0_to_p1(flux_err_coarse, Function(V))
+
+    # Sanity check and logging
+    flux_err = sobolev_norm(S_ex-S, q, k=0)
+    assert np.isclose(assemble(flux_err_fine  *dx), flux_err**q)
+    assert np.isclose(assemble(flux_err_coarse*dx), flux_err**q)
+    assert np.isclose(assemble(flux_err_p1    *dx), flux_err**q)
+    info_blue(r"||\sigma(u)-\sigma(u_h)||_q^q = %g" % flux_err**q)
+
     # Global lifting of W^{-1, p'} functional R = f + div(S)
     u.set_allow_extrapolation(True) # Needed hack
     r_glob = compute_global_lifting(p, mesh, f, S)
@@ -118,8 +141,10 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     ratio_a = ( N * C_PF * r_norm_loc ) / r_norm_glob
     ratio_b = r_norm_glob / r_norm_loc
     ratio_a_PF = ( N * r_norm_loc_PF ) / r_norm_glob
+    ratio_c = flux_err / r_norm_glob
     assert ratio_a >= 1.0 and ratio_b >= 1.0
     assert ratio_a_PF >= 1.0
+    assert ratio_c >= 1.0
 
     # Report
     info_blue(r"||\nabla r||_p^{p-1} = %g, ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q} = %g"
@@ -127,8 +152,9 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     info_blue("C_{cont,PF} = %g" %  C_PF)
     info_green("(4.8a) ok: rhs/lhs = %g >= 1" % ratio_a)
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
+    info_green("ratio_c = %g >= 1" % ratio_c)
 
-    return dr_glob_p1, r_loc_p1, ee_p1, C_PF, r_norm_glob, r_norm_loc, ratio_a, ratio_a_PF, ratio_b
+    return dr_glob_p1, r_loc_p1, ee_p1, flux_err_p1, C_PF, r_norm_glob, r_norm_loc, flux_err, ratio_a, ratio_a_PF, ratio_b, ratio_c
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -239,8 +265,14 @@ def compute_cellwise_grad(r, p, mesh_fine=None):
     """
     # Compute desired quantity accurately on fine mesh
     mesh_fine = mesh_fine or r.function_space().mesh()
+    dr_fine, dr_coarse = compute_cellwise_norm((grad(r)**2)**Constant(0.5*p), mesh_fine)
+    return dr_fine, dr_coarse
+
+
+def compute_cellwise_norm(expression, mesh_fine):
+    # Compute desired quantity accurately on fine mesh
     P0_fine = FunctionSpace(mesh_fine, 'Discontinuous Lagrange', 0)
-    dr_fine = project((grad(r)**2)**Constant(0.5*p), P0_fine)
+    dr_fine = project(expression, P0_fine)
 
     # Special case
     mesh_coarse = mesh_fine.root_node()
@@ -319,7 +351,7 @@ def distribute_p0_to_p1(f, out=None):
     return out
 
 
-def plot_liftings(glob, loc, ee, prefix):
+def plot_liftings(glob, loc, ee, fe, prefix):
     path = "./"
     mkdir_p(path)
 
@@ -332,6 +364,26 @@ def plot_liftings(glob, loc, ee, prefix):
     pyplot.savefig(os.path.join(path, prefix+"_r_w.pdf"))
     plot_alongside(glob, loc, mode="contour")
     pyplot.savefig(os.path.join(path, prefix+"_r_c.pdf"))
+
+    # Plot global lifting norm anf flux error on patches
+    plot_alongside(glob, fe, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_gf_f.pdf"))
+    plot_alongside(glob, fe, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_gf_g.pdf"))
+    plot_alongside(glob, fe, mode="warp", range_min=0.0)
+    pyplot.savefig(os.path.join(path, prefix+"_gf_w.pdf"))
+    plot_alongside(glob, fe, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_gf_c.pdf"))
+
+    # Plot local lifting norm anf flux error on patches
+    plot_alongside(loc, fe, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_lf_f.pdf"))
+    plot_alongside(loc, fe, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_lf_g.pdf"))
+    plot_alongside(loc, fe, mode="warp", range_min=0.0)
+    pyplot.savefig(os.path.join(path, prefix+"_lf_w.pdf"))
+    plot_alongside(loc, fe, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_lf_c.pdf"))
 
     # Plot global lifting and energy error norms on patches
     plot_alongside(glob, ee, common_cbar=False, mode="color", shading="flat", edgecolors="k")
@@ -395,13 +447,13 @@ def plot_cutoff_distribution(p, mesh, prefix):
 
 
 def format_result(*args):
-    assert len(args) == 9
+    assert len(args) == 11
     assert isinstance(args[0], str) and len(args[0].split()) == 1
     assert isinstance(args[2], int)
-    assert all(isinstance(args[i], float) for i in [1]+range(3, 9))
+    assert all(isinstance(args[i], float) for i in [1]+range(3, 11))
     print("#RESULT name, p, num_cells, C_{cont,PF}, " \
-          "||E_glob||_q, ||E_loc||_q, Eff_(4.8a), Eff_(4.8b)")
-    print("RESULT %s %s %4d %.3f %.4f %.4f %.1f %.1f %.2f" % args)
+          "||E_glob||_q, ||E_loc||_q, ||E_flux||_q, Eff_(4.8a), Eff_(4.8b), Eff_(flux/glob)")
+    print("RESULT %s %s %4d %.3f %.4f %.4f %.4f %.1f %.1f %.2f %.2f " % args)
 
 
 def test_ChaillouSuri(p, N):
@@ -417,11 +469,11 @@ def test_ChaillouSuri(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee = result[0], result[1], result[2]
+    glob, loc, ee, fe = result[0], result[1], result[2], result[3]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, label)
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, fe, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -453,11 +505,11 @@ def test_CarstensenKlose(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee = result[0], result[1], result[2]
+    glob, loc, ee, fe = result[0], result[1], result[2], result[3]
 
     # Report
-    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[3:])
-    plot_liftings(glob, loc, ee, label)
+    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[4:])
+    plot_liftings(glob, loc, ee, fe, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
