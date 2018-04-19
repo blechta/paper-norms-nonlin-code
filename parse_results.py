@@ -11,7 +11,7 @@ prefix = ""
 # Snippets for LaTeX tabular
 prolog = r"""\begin{table}[b]
 \centering
-\begin{tabular}{lrrrrrrr}
+\begin{tabular}{lrrrrrrrrr}
 %
 Case
 & \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
