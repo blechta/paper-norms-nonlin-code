@@ -65,7 +65,7 @@ You will need
 Copyright
 =========
 
-Copyright 2015-2016 Jan Blechta
+Copyright 2015-2016, 2018 Jan Blechta
 
 
 License

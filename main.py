@@ -1,4 +1,4 @@
-# Copyright (C) 2015, 2016 Jan Blechta
+# Copyright (C) 2015, 2016, 2018 Jan Blechta
 #
 # This file is part of dolfin-tape.
 #

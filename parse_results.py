@@ -17,14 +17,16 @@ Case
 & \#cells & $C_{\mathrm{cont}, \mathrm{PF}}$
 & $\norm{\epsilon_\mathrm{glob}}_q$
 & $\norm{\epsilon_\mathrm{loc}}_q$
+& $\norm{\epsilon_\mathrm{flux}}_q$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_1}}}$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_impr_1}}}$
 & $\mathrm{Eff_{\eqref{eq_loc_dual_gal_2}}}$
+& $\mathrm{Eff_{\eqref{eq_est_flux}}}$
 \\\hline\hline
 %
 """
 mrow_begin = r"\multirow{%s}{*}{\parbox{3cm}{\centering %s $p=%s$, $N=3$}}" + os.linesep
-row = r"& %s & %s & %s & %s & %s & %s & %s \\" + os.linesep
+row = r"& %s & %s & %s & %s & %s & %s & %s & %s & %s \\" + os.linesep
 mrow_end = r"\hline" + os.linesep
 epilog = r"""\end{tabular}
 \caption{Computed quantities of localization inequalities~\eqref{eq_loc_dual_gal_1},
