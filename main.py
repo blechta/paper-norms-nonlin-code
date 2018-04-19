@@ -385,6 +385,16 @@ def plot_liftings(glob, loc, ee, fe, prefix):
     plot_alongside(loc, fe, mode="contour")
     pyplot.savefig(os.path.join(path, prefix+"_lf_c.pdf"))
 
+    # Plot global and local lifting and flux error norms on patches
+    plot_alongside(glob, loc, fe, mode="color", shading="flat", edgecolors="k")
+    pyplot.savefig(os.path.join(path, prefix+"_glf_f.pdf"))
+    plot_alongside(glob, loc, fe, mode="color", shading="gouraud")
+    pyplot.savefig(os.path.join(path, prefix+"_glf_g.pdf"))
+    plot_alongside(glob, loc, fe, mode="warp", range_min=0.0)
+    pyplot.savefig(os.path.join(path, prefix+"_glf_w.pdf"))
+    plot_alongside(glob, loc, fe, mode="contour")
+    pyplot.savefig(os.path.join(path, prefix+"_glf_c.pdf"))
+
     # Plot global lifting and energy error norms on patches
     plot_alongside(glob, ee, common_cbar=False, mode="color", shading="flat", edgecolors="k")
     pyplot.savefig(os.path.join(path, prefix+"_ee_f.pdf"))
