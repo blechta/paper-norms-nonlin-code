@@ -62,8 +62,8 @@ def plot_errors(g, l, f, e, label):
         ( 92,  16),
         (332,  16),
         (332, 296),
-        (712, 296),
-        (712, 564),
+        (720, 296),
+        (720, 564),
         ( 92, 564),
     ), fill=False)
     fig.patches.append(frame)
@@ -73,7 +73,7 @@ def plot_errors(g, l, f, e, label):
         (4, e, r"$\epsilon_\mathrm{en}^p$"),
     ]
     _plot_subplots(2, 2, functions, [0.85, 0.05, 0.05, 0.40])
-    frame = pyplot.Rectangle((356, 16), 356, 264, fill=False)
+    frame = pyplot.Rectangle((356, 16), 364, 264, fill=False)
     fig.patches.append(frame)
 
     # Save as PDF
