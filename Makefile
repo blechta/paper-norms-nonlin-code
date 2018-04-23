@@ -34,6 +34,9 @@ tabular.tex: parse_results.py $(LOGS)
 	$(eval CMD=python $< $(subst _, ,$*) >$@ 2>&1 || true)
 	$(RUNNER)
 
+	$(eval CMD=python postprocess.py $(subst _, ,$*) >>$@ 2>&1 || true)
+	$(RUNNER)
+
 init-docker:
 	docker history -q $(DOCKER_IMG) >/dev/null 2>&1 || docker pull $(DOCKER_IMG)
 	docker inspect $(DOCKER_CACHE) >/dev/null 2>&1 || \
