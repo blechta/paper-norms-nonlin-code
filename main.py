@@ -49,15 +49,20 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     r"""Find approximation to p-Laplace problem with rhs f,
     and compute global and local liftings of the residual.
     Return tuple (
+        u_h,
         \sum_a ||\nabla r     ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla r^a   ||_{p,\omega_a}^p \psi_a/|\omega_a|,
         \sum_a ||\nabla(u-u_h)||_{p,\omega_a}^p \psi_a/|\omega_a|,
+        \sum_a ||\sigma(\nabla u)-\sigma(\nabla u_h)||_{q,\omega_a}^q \psi_a/|\omega_a|,
         C_{cont,PF},
         ||\nabla r||_p^{p-1},
         ( 1/N \sum_a ||\nabla r_a||_p^p )^{1/q},
-        Eff_{(4.8a)},
-        Eff_{(4.8b)}
-    ). First three are P1 functions, the rest are numbers.
+        ||\sigma(\nabla u) - \sigma(\nabla u_h)||_q,
+        N * C_PF * r_norm_loc / r_norm_glob,
+        N * r_norm_loc_PF / r_norm_glob,
+        r_norm_glob / r_norm_loc,
+        flux_err / r_norm_glob,
+    ). First five are P1 functions, the rest are numbers.
     """
     q = p/(p-1) # Dual Lebesgue exponent
     N = mesh.topology().dim() + 1 # Vertices per cell
@@ -154,7 +159,8 @@ def compute_liftings(name, p, mesh, f, exact_solution=None):
     info_green("(4.8b) ok: rhs/lhs = %g >= 1" % ratio_b)
     info_green("ratio_c = %g >= 1" % ratio_c)
 
-    return dr_glob_p1, r_loc_p1, ee_p1, flux_err_p1, C_PF, r_norm_glob, r_norm_loc, flux_err, ratio_a, ratio_a_PF, ratio_b, ratio_c
+    return u, dr_glob_p1, r_loc_p1, ee_p1, flux_err_p1, \
+        C_PF, r_norm_glob, r_norm_loc, flux_err, ratio_a, ratio_a_PF, ratio_b, ratio_c
 
 
 def compute_global_lifting(p, mesh, f, S):
@@ -351,6 +357,20 @@ def distribute_p0_to_p1(f, out=None):
     return out
 
 
+def save_functions(uh, glob, loc, ee, fe, prefix):
+    path = "./"
+    mkdir_p(path)
+
+    naming = {"uh": uh, "glob": glob, "loc": loc, "ee": ee, "fe": fe}
+
+    for name, func in naming.iteritems():
+        filename = os.path.join(path, prefix + "_" + name + ".h5")
+        mesh = func.function_space().mesh()
+        with HDF5File(mesh.mpi_comm(), filename, 'w') as f:
+            f.write(mesh, "mesh")
+            f.write(func, "func")
+
+
 def plot_liftings(glob, loc, ee, fe, prefix):
     path = "./"
     mkdir_p(path)
@@ -479,11 +499,12 @@ def test_ChaillouSuri(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee, fe = result[0], result[1], result[2], result[3]
+    uh, glob, loc, ee, fe = result[0:5]
 
     # Report
-    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[4:])
+    format_result('Chaillou--Suri', p, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, fe, label)
+    save_functions(uh, glob, loc, ee, fe, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
@@ -515,11 +536,12 @@ def test_CarstensenKlose(p, N):
 
     # Now the heavy lifting
     result = compute_liftings(label, p, mesh, f, u)
-    glob, loc, ee, fe = result[0], result[1], result[2], result[3]
+    uh, glob, loc, ee, fe = result[0:5]
 
     # Report
-    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[4:])
+    format_result('Carstensen--Klose', p, mesh.num_cells(), *result[5:])
     plot_liftings(glob, loc, ee, fe, label)
+    save_functions(uh, glob, loc, ee, fe, label)
     list_timings(TimingClear_clear, [TimingType_wall])
 
 
