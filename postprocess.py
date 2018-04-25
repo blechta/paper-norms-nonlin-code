@@ -57,7 +57,7 @@ def plot_errors(g, l, f, e, label):
         (2, l, r"$\epsilon_\mathrm{loc}^q$"),
         (3, f, r"$\epsilon_\mathrm{flux}^q$"),
     ]
-    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.05, 0.40])
+    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.02, 0.40])
     frame = pyplot.Polygon((
         ( 92,  16),
         (332,  16),
@@ -72,7 +72,7 @@ def plot_errors(g, l, f, e, label):
     functions = [
         (4, e, r"$\epsilon_\mathrm{en}^p$"),
     ]
-    _plot_subplots(2, 2, functions, [0.85, 0.05, 0.05, 0.40])
+    _plot_subplots(2, 2, functions, [0.85, 0.05, 0.02, 0.40])
     frame = pyplot.Rectangle((356, 16), 364, 264, fill=False)
     fig.patches.append(frame)
 
