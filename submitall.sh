@@ -1,2 +1,2 @@
 #!/bin/bash
-nohup make -j12 > makelog 2>&1 < /dev/null &
+nohup make -j12 > make.log 2>&1 < /dev/null &
