@@ -174,7 +174,7 @@ RUN bash -l -c "source $HOME/fenics.conf && \
                 build_fenics dolfin-tape"
 
 # NFS-safe file-locking in Instant
-RUN bash -l -c "pip install --prefix=/home/fenics/build/ flufl.lock"
+RUN bash -l -c "pip install --prefix=/home/fenics/build/ flufl.lock==2.4.1"
 
 # Update matplotlib for figures of smaller size
 RUN bash -l -c "sudo apt remove -y python-matplotlib && pip install --prefix=/home/fenics/build/ matplotlib==2.2.2"
