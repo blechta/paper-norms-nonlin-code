@@ -18,6 +18,9 @@
 from __future__ import print_function
 
 import matplotlib
+#matplotlib.rc('font', family='serif', serif=['computer modern roman'])
+#matplotlib.rc('font', family='serif')
+matplotlib.rc('mathtext', fontset='cm')
 matplotlib.use("agg")
 
 from matplotlib import pyplot
@@ -80,9 +83,37 @@ def plot_errors(g, l, f, e, label):
     pyplot.savefig(os.path.join(path, label+"_glfe_w.pdf"))
 
 
-def _plot_subplots(nrows, ncols, functions, cbar_rect):
+def plot_effectivities(g, l, f, label):
+    path = "./"
+
+    # Prepare figure
+    fig = pyplot.figure(figsize=(6, 12))
+
+    # Plot effectivities g/l, f/l, f/g
+    functions = [
+        (1, g, l, r"\frac{\epsilon_\mathrm{glob}^q}{\epsilon_\mathrm{loc }^q}", 1.0),
+        (2, f, l, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{loc }^q}", 1.0),
+        (3, f, g, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{glob}^q}", 0.0),
+    ]
+
+    for i, f1, f2, title, range_min in functions:
+        #assert(f1.function_space() == f2.function_space())
+        assert(f1.function_space().ufl_element() == f2.function_space().ufl_element())
+        assert(f1.function_space().mesh().hash() == f2.function_space().mesh().hash())
+        eff = Function(f1.function_space())
+        eff.vector()[:] = f1.vector().array() / f2.vector().array()
+        print(r"\min_\Omega {} = {}".format(title, eff.vector().array().min()))
+        _plot_subplots(3, 1, [(i, eff, r"${}$".format(title))],
+                       [0.85, 0.27*(3-i)+0.10, 0.02, 0.20],
+                       range_min=range_min)
+
+    # Save as PDF
+    pyplot.savefig(os.path.join(path, label+"_eff_w.pdf"))
+
+
+def _plot_subplots(nrows, ncols, functions, cbar_rect, range_min=None):
     # Extract common range
-    range_min = 0.0
+    range_min = range_min or 0.0
     range_max = max(item[1].vector().max() for item in functions)
 
     # Create subplots
@@ -110,6 +141,7 @@ def postprocess(name, p, N):
 
     # Create and save plots
     plot_errors(g, l, f, e, label)
+    plot_effectivities(g, l, f, label)
 
 
 def main(argv):
