@@ -138,11 +138,11 @@ RUN export PETSC_DIR=/usr/local && \
 ENV SLEPC_DIR=/usr/local \
     PETSC_DIR=/usr/local
 
-RUN pip install --upgrade pip && \
-    pip install --upgrade setuptools
+RUN pip install --upgrade pip==8.1.2 && \
+    pip install --upgrade setuptools==24.0.1
 
 # Install sympy, petsc4py, slepc4py and swig from source
-RUN pip install sympy && \
+RUN pip install sympy==1.0 && \
     easy_install \
      https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-2.0.0.tar.gz && \
     easy_install \
@@ -174,7 +174,7 @@ RUN bash -l -c "source $HOME/fenics.conf && \
                 build_fenics dolfin-tape"
 
 # NFS-safe file-locking in Instant
-RUN bash -l -c "pip install --prefix=/home/fenics/build/ flufl.lock==2.4.1"
+RUN pip install --user flufl.lock==2.4.1
 
 # Update matplotlib for figures of smaller size
-RUN bash -l -c "sudo apt remove -y python-matplotlib && pip install --prefix=/home/fenics/build/ matplotlib==2.2.2"
+RUN pip install --user matplotlib==2.2.2
