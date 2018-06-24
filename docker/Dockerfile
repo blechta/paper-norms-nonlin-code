@@ -128,7 +128,7 @@ RUN wget --quiet -nc http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-li
 
 # Install SLEPc from source
 RUN export PETSC_DIR=/usr/local && \
-    wget -nc --quiet http://www.grycap.upv.es/slepc/download/download.php?filename=slepc-${SLEPC_VERSION}.tar.gz -O slepc-${SLEPC_VERSION}.tar.gz && \
+    wget -nc --quiet http://slepc.upv.es/download/distrib/slepc-${SLEPC_VERSION}.tar.gz -O slepc-${SLEPC_VERSION}.tar.gz && \
     tar -xf slepc-${SLEPC_VERSION}.tar.gz && \
     cd slepc-${SLEPC_VERSION} && \
     ./configure --prefix=/usr/local && \
