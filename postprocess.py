@@ -60,13 +60,13 @@ def plot_errors(g, l, f, e, label):
         (2, l, r"$\epsilon_\mathrm{loc}^q$"),
         (3, f, r"$\epsilon_\mathrm{flux}^q$"),
     ]
-    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.02, 0.40])
+    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.02, 0.40], 12, 8)
     frame = pyplot.Polygon((
         ( 92,  16),
-        (332,  16),
-        (332, 296),
-        (720, 296),
-        (720, 564),
+        (340,  16),
+        (340, 296),
+        (672, 296),
+        (672, 564),
         ( 92, 564),
     ), fill=False)
     fig.patches.append(frame)
@@ -75,8 +75,8 @@ def plot_errors(g, l, f, e, label):
     functions = [
         (4, e, r"$\epsilon_\mathrm{en}^p$"),
     ]
-    _plot_subplots(2, 2, functions, [0.85, 0.05, 0.02, 0.40])
-    frame = pyplot.Rectangle((356, 16), 364, 264, fill=False)
+    _plot_subplots(2, 2, functions, [0.85, 0.05, 0.02, 0.40], 12, 8)
+    frame = pyplot.Rectangle((364, 16), 308, 264, fill=False)
     fig.patches.append(frame)
 
     # Save as PDF
@@ -104,14 +104,14 @@ def plot_effectivities(g, l, f, label):
         eff.vector()[:] = f1.vector().array() / f2.vector().array()
         print(r"\min_\Omega {} = {}".format(title, eff.vector().array().min()))
         _plot_subplots(3, 1, [(i, eff, r"${}$".format(title))],
-                       [0.85, 0.27*(3-i)+0.10, 0.02, 0.20],
+                       [0.75, 0.32*(3-i)+0.05, 0.02, 0.24], 21, 10,
                        range_min=range_min)
 
     # Save as PDF
     pyplot.savefig(os.path.join(path, label+"_eff_w.pdf"))
 
 
-def _plot_subplots(nrows, ncols, functions, cbar_rect, range_min=None):
+def _plot_subplots(nrows, ncols, functions, cbar_rect, tfs, lfs, range_min=None):
     # Extract common range
     range_min = range_min or 0.0
     range_max = max(item[1].vector().max() for item in functions)
@@ -119,15 +119,26 @@ def _plot_subplots(nrows, ncols, functions, cbar_rect, range_min=None):
     # Create subplots
     for i, func, t in functions:
         sp = pyplot.subplot(nrows, ncols, i, projection="3d")
-        p = plot(func, backend="matplotlib", mode="warp", title=t,
+        p = plot(func, backend="matplotlib", mode="warp",
                  range_min=range_min, range_max=range_max)
         ax = pyplot.gca(projection="3d")
         ax.set_zlim(range_min, range_max)
+        ax.set_title(t, fontdict={'fontsize': tfs}, x=0.2)
+        ax.ticklabel_format(style='sci', axis='z', scilimits=(-3, 6))
+        ax.get_xaxis().set_ticks([])
+        ax.get_yaxis().set_ticks([])
+        ax.set_zlabel("", labelpad=4)
+        ax.zaxis.get_offset_text().set_fontsize(lfs)
+        ax.tick_params(axis='both', which='major', labelsize=lfs, pad=4)
 
     # Create common colorbar
-    pyplot.subplots_adjust(right=0.8)
+    pyplot.subplots_adjust(right=0.8,wspace=0.15,top=0.92,bottom=0.04,hspace=0.315)
     cbar_ax = pyplot.gcf().add_axes(cbar_rect)
-    pyplot.colorbar(p, cax=cbar_ax)
+    cbar_ax.tick_params(axis='both', which='major', labelsize=lfs)
+    cbar_ax.yaxis.get_offset_text().set_fontsize(lfs)
+    cbar = pyplot.colorbar(p, cax=cbar_ax)
+    cbar.formatter.set_powerlimits((-3, 6))
+    cbar.update_ticks()
 
 
 def postprocess(name, p, N):
