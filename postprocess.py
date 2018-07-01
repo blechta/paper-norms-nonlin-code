@@ -60,7 +60,7 @@ def plot_errors(g, l, f, e, label):
         (2, l, r"$\epsilon_\mathrm{loc}^q$"),
         (3, f, r"$\epsilon_\mathrm{flux}^q$"),
     ]
-    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.02, 0.40], 12, 8)
+    _plot_subplots(2, 2, functions, [0.85, 0.55, 0.02, 0.40], 12, 8, zmin=0.0)
     frame = pyplot.Polygon((
         ( 92,  16),
         (340,  16),
@@ -89,14 +89,21 @@ def plot_effectivities(g, l, f, label):
     # Prepare figure
     fig = pyplot.figure(figsize=(6, 12))
 
-    # Plot effectivities g/l, f/l, f/g
-    functions = [
-        (1, g, l, r"\frac{\epsilon_\mathrm{glob}^q}{\epsilon_\mathrm{loc }^q}", 1.0),
-        (2, f, l, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{loc }^q}", 1.0),
-        (3, f, g, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{glob}^q}", 0.0),
-    ]
+    # Treat CK differently (cut-off effectivity plots)
+    if "CarstensenKlose" in label:
+        functions = [
+            (1, g, l, r"\frac{\epsilon_\mathrm{glob}^q}{\epsilon_\mathrm{loc }^q}", 1.0, 5.0,  5.0,  'max'),
+            (2, f, l, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{loc }^q}", 1.0, 5.0,  5.0,  'max'),
+            (3, f, g, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{glob}^q}", 1.0, None, None, 'neither'),
+        ]
+    else:
+        functions = [
+            (1, g, l, r"\frac{\epsilon_\mathrm{glob}^q}{\epsilon_\mathrm{loc }^q}", 1.0, None, None, 'neither'),
+            (2, f, l, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{loc }^q}", 1.0, None, None, 'neither'),
+            (3, f, g, r"\frac{\epsilon_\mathrm{flux}^q}{\epsilon_\mathrm{glob}^q}", 1.0, None, None, 'neither'),
+        ]
 
-    for i, f1, f2, title, range_min in functions:
+    for i, f1, f2, title, zmin, zmax, cmax, cext in functions:
         #assert(f1.function_space() == f2.function_space())
         assert(f1.function_space().ufl_element() == f2.function_space().ufl_element())
         assert(f1.function_space().mesh().hash() == f2.function_space().mesh().hash())
@@ -105,24 +112,32 @@ def plot_effectivities(g, l, f, label):
         print(r"\min_\Omega {} = {}".format(title, eff.vector().array().min()))
         _plot_subplots(3, 1, [(i, eff, r"${}$".format(title))],
                        [0.75, 0.32*(3-i)+0.05, 0.02, 0.24], 21, 10,
-                       range_min=range_min)
+                       zmin=zmin, zmax=zmax, cmax=cmax, cbar_extend=cext)
 
     # Save as PDF
     pyplot.savefig(os.path.join(path, label+"_eff_w.pdf"))
 
 
-def _plot_subplots(nrows, ncols, functions, cbar_rect, tfs, lfs, range_min=None):
+def _plot_subplots(nrows, ncols, functions, cbar_rect, tfs, lfs,
+                   cmin=None, cmax=None, zmin=None, zmax=None,
+                   cbar_extend='neither'):
     # Extract common range
-    range_min = range_min or 0.0
-    range_max = max(item[1].vector().max() for item in functions)
+    if cmin is None:
+        cmin = min(item[1].vector().min() for item in functions)
+    if cmax is None:
+        cmax = max(item[1].vector().max() for item in functions)
+    if zmin is None:
+        zmin = min(item[1].vector().min() for item in functions)
+    if zmax is None:
+        zmax = max(item[1].vector().max() for item in functions)
 
     # Create subplots
     for i, func, t in functions:
         sp = pyplot.subplot(nrows, ncols, i, projection="3d")
         p = plot(func, backend="matplotlib", mode="warp",
-                 range_min=range_min, range_max=range_max)
+                 vmin=cmin, vmax=cmax)
         ax = pyplot.gca(projection="3d")
-        ax.set_zlim(range_min, range_max)
+        ax.set_zlim(zmin, zmax)
         ax.set_title(t, fontdict={'fontsize': tfs}, x=0.2)
         ax.ticklabel_format(style='sci', axis='z', scilimits=(-3, 6))
         ax.get_xaxis().set_ticks([])
@@ -136,7 +151,7 @@ def _plot_subplots(nrows, ncols, functions, cbar_rect, tfs, lfs, range_min=None)
     cbar_ax = pyplot.gcf().add_axes(cbar_rect)
     cbar_ax.tick_params(axis='both', which='major', labelsize=lfs)
     cbar_ax.yaxis.get_offset_text().set_fontsize(lfs)
-    cbar = pyplot.colorbar(p, cax=cbar_ax)
+    cbar = pyplot.colorbar(p, cax=cbar_ax, extend=cbar_extend)
     cbar.formatter.set_powerlimits((-3, 6))
     cbar.update_ticks()
 
