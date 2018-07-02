@@ -26,6 +26,8 @@ matplotlib.use("agg")
 from matplotlib import pyplot
 from mpl_toolkits.mplot3d import axes3d
 
+import numpy as np
+
 from dolfin import *
 
 import os
@@ -109,7 +111,18 @@ def plot_effectivities(g, l, f, label):
         assert(f1.function_space().mesh().hash() == f2.function_space().mesh().hash())
         eff = Function(f1.function_space())
         eff.vector()[:] = f1.vector().array() / f2.vector().array()
+
+        print(r"\max_\Omega {} = {}".format(title, eff.vector().array().max()))
         print(r"\min_\Omega {} = {}".format(title, eff.vector().array().min()))
+
+        # Trim few very large overshoots to prevent undershoots in plots which
+        # are rendering artifacts. Note that this does not change qualitative
+        # look of overshoots in the figures, just prevents undershoots.
+        eff_arr = eff.vector().array()
+        print('Trimming values {} in {} to 80.0'.format(eff_arr[eff_arr > 80.0], title))
+        eff_arr[eff_arr > 80.0] = 80.0
+        eff.vector()[:] = eff_arr
+
         _plot_subplots(3, 1, [(i, eff, r"${}$".format(title))],
                        [0.75, 0.32*(3-i)+0.05, 0.02, 0.24], 21, 10,
                        zmin=zmin, zmax=zmax, cmax=cmax, cbar_extend=cext)
