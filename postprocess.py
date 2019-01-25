@@ -18,9 +18,11 @@
 from __future__ import print_function
 
 import matplotlib
+#matplotlib.rc('font', family='serif', serif=['Latin Modern Roman'])
 #matplotlib.rc('font', family='serif', serif=['computer modern roman'])
 #matplotlib.rc('font', family='serif')
-matplotlib.rc('mathtext', fontset='cm')
+#matplotlib.rc('mathtext', fontset='cm')
+matplotlib.rc('mathtext', fontset='dejavuserif')
 matplotlib.use("agg")
 
 from matplotlib import pyplot
